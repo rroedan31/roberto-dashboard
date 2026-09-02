@@ -1,0 +1,3264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>Panel de Roberto | Tareas, Clases y Pagos</title>
+  
+  <!-- PWA & iOS Mobile App Meta Tags -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#2B344A" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RobertoApp" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" type="image/png" href="icon-192.png" />
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50:  '#e8edf4',
+              100: '#c5d3e6',
+              200: '#9eb8d8',
+              500: '#1776CC',
+              600: '#1260aa',
+              700: '#0e4d8a',
+              800: '#2B344A',
+              900: '#1c2233',
+            },
+            primary: {
+              DEFAULT: '#2B344A',
+              dark:    '#1c2233',
+              light:   '#3d4f6e',
+            },
+            accent: {
+              DEFAULT: '#1776CC',
+              light:   '#3a91dc',
+              dark:    '#1260aa',
+            },
+            base: {
+              DEFAULT: '#F7F7F7',
+              dark:    '#e8e8e8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- React & Babel CDNs -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #475569;
+    }
+  </style>
+</head>
+<body class="bg-base text-slate-900 dark:bg-primary-dark dark:text-slate-100 min-h-screen antialiased transition-colors duration-200">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ----------------------------------------------------
+    // CONSTANTES Y MOTOR DE ALMACENAMIENTO PERSISTENTE LOCAL
+    // ----------------------------------------------------
+    const STORAGE_KEY = 'roberto_dashboard_v12_clean_duplicates';
+
+    const INITIAL_DATA = {
+      user: {
+        name: 'Roberto',
+        title: 'Profesor y Tutor Privado',
+        email: 'roberto@ejemplo.com',
+        hourlyRate: 1500
+      },
+      tasks: [],
+      classes: [
+        {
+          id: 'c-1',
+          name: 'Clase con Miguel Rojas',
+          subject: 'Tutoría',
+          dayOfWeek: 'Miércoles',
+          time: '18:00 - 19:00',
+          date: '2026-09-02',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-1'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora'
+        },
+        {
+          id: 'c-2',
+          name: 'Clase con Merari Vasquez',
+          subject: 'Tutoría',
+          dayOfWeek: 'Miércoles',
+          time: '19:00 - 20:00',
+          date: '2026-09-02',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-2'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora'
+        },
+        {
+          id: 'c-3',
+          name: 'Clase con Julio Polanco (Gratis)',
+          subject: 'Tutoría',
+          dayOfWeek: 'Jueves',
+          time: '05:30 - 06:30',
+          date: '2026-09-03',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-6'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora de cortesía (gratis)'
+        },
+        {
+          id: 'c-4',
+          name: 'Clase con Oriolis y Miguel',
+          subject: 'Tutoría',
+          dayOfWeek: 'Viernes',
+          time: '17:00 - 18:00',
+          date: '2026-09-04',
+          durationMinutes: 60,
+          location: '',
+          capacity: 2,
+          enrolledStudentIds: ['s-4', 's-1'],
+          status: 'Programada',
+          description: 'Sesión compartida de 1 hora a las 5:00 PM'
+        }
+      ],
+      students: [
+        { id: 's-1', name: 'Miguel Rojas', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: 'Clases: Mié 18:00 y Vie 17:00 (Pendiente de pago)', balanceDue: 3000 },
+        { id: 's-2', name: 'Merari Vasquez', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: 'Clase: Mié 19:00 (Pendiente de pago)', balanceDue: 2000 },
+        { id: 's-3', name: 'Fabio Silvestri', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-4', name: 'Oriolis Olivero', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: 'Clase: Vie 17:00 (Pendiente de pago)', balanceDue: 1500 },
+        { id: 's-5', name: 'Alejandro Polanco', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-6', name: 'Julio Polanco', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: 'Clase jueves 5:30 AM es de cortesía (gratis)', balanceDue: 0 },
+        { id: 's-7', name: 'Irwin Viloria', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-8', name: 'Irwin Viloria Padre', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-9', name: 'Gisselle Franco', email: '', phone: '', hourlyRate: 2500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-10', name: 'Jonathan Rincon', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 }
+      ],
+      bookings: [
+        { id: 'b-1', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-1', className: 'Clase con Miguel Rojas', date: '2026-09-02', time: '18:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-2', studentId: 's-2', studentName: 'Merari Vasquez', classId: 'c-2', className: 'Clase con Merari Vasquez', date: '2026-09-02', time: '19:00', duration: 60, rate: 2000, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-3', studentId: 's-6', studentName: 'Julio Polanco', classId: 'c-3', className: 'Clase con Julio Polanco (Gratis)', date: '2026-09-03', time: '05:30', duration: 60, rate: 0, status: 'Confirmada', paymentStatus: 'Pagado' },
+        { id: 'b-4', studentId: 's-4', studentName: 'Oriolis Olivero', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-5', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' }
+      ],
+      payments: [
+        { id: 'inv-1', invoiceNum: 'FAC-2026-001', studentId: 's-1', studentName: 'Miguel Rojas', amount: 1500, date: '2026-09-02', dueDate: '2026-09-09', method: 'Transferencia', status: 'Pendiente', notes: 'Clase individual del Miércoles 2 sep (18:00)' },
+        { id: 'inv-2', invoiceNum: 'FAC-2026-002', studentId: 's-2', studentName: 'Merari Vasquez', amount: 2000, date: '2026-09-02', dueDate: '2026-09-09', method: 'Transferencia', status: 'Pendiente', notes: 'Clase individual del Miércoles 2 sep (19:00)' },
+        { id: 'inv-3', invoiceNum: 'FAC-2026-003', studentId: 's-4', studentName: 'Oriolis Olivero', amount: 1500, date: '2026-09-04', dueDate: '2026-09-11', method: 'Transferencia', status: 'Pendiente', notes: 'Clase compartida del Viernes 4 sep (17:00)' },
+        { id: 'inv-4', invoiceNum: 'FAC-2026-004', studentId: 's-1', studentName: 'Miguel Rojas', amount: 1500, date: '2026-09-04', dueDate: '2026-09-11', method: 'Transferencia', status: 'Pendiente', notes: 'Clase compartida del Viernes 4 sep (17:00)' }
+      ],
+      finanzas: {
+        capitalActual: 0,
+        dineroDisponible: 0,
+        otrosIngresos: [],
+        deudas: [],
+      }
+    };
+
+    // ----------------------------------------------------
+    // ICONOS SVG INTEGRADOS
+    // ----------------------------------------------------
+    const Icons = {
+      Dashboard: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
+      Tasks: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>,
+      Classes: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>,
+      Students: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>,
+      Payments: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      Reports: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
+      Plus: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4"/></svg>,
+      Check: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>,
+      Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
+      Search: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
+      Download: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>,
+      Upload: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>,
+      Refresh: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>,
+      ExternalLink: () => <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>,
+      Calendar: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
+      Clock: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+      Moon: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>,
+      Sun: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>,
+      EmptyBox: () => <svg className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>,
+      ChevronLeft: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7"/></svg>,
+      ChevronRight: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+    };
+
+    // ----------------------------------------------------
+    // COMPONENTE PRINCIPAL DE LA APLICACIÓN
+    // ----------------------------------------------------
+    // Función auxiliar para eliminar facturas duplicadas
+    function deduplicatePaymentsList(paymentsList) {
+      if (!Array.isArray(paymentsList)) return [];
+      const seen = new Set();
+      const clean = [];
+      for (const p of paymentsList) {
+        // Clave única basada en alumno, monto, fecha y concepto
+        const key = `${p.studentId || p.studentName}|${p.amount}|${p.date}|${(p.notes || '').trim()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          clean.push(p);
+        }
+      }
+      return clean;
+    }
+
+    function App() {
+      const [data, setData] = useState(() => {
+        try {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            return {
+              ...parsed,
+              payments: deduplicatePaymentsList(parsed.payments || [])
+            };
+          }
+          // Scan all previous keys to find any saved tasks, classes, payments, finanzas
+          const allHistoricalKeys = [
+            'roberto_dashboard_v11_restore_tasks',
+            'roberto_dashboard_v10_data_fix',
+            'roberto_dashboard_v9_finanzas_fix',
+            'roberto_dashboard_v8_finanzas',
+            'roberto_dashboard_v7_friday_and_pending',
+            'roberto_dashboard_v6_schedule',
+            'roberto_dashboard_v6',
+            'roberto_dashboard_v5_rates',
+            'roberto_dashboard_v4_students',
+            'roberto_dashboard_v3_clean',
+            'roberto_dashboard_v2_es',
+            'roberto_dashboard_v2_data',
+            'roberto_dashboard_v1'
+          ];
+          
+          let foundTasks = [];
+          let foundClasses = [];
+          let foundBookings = [];
+          let foundPayments = [];
+          let foundFinanzas = null;
+
+          // Check explicit keys
+          for (const key of allHistoricalKeys) {
+            try {
+              const val = localStorage.getItem(key);
+              if (val) {
+                const parsed = JSON.parse(val);
+                if ((!foundTasks || foundTasks.length === 0) && Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+                  foundTasks = parsed.tasks;
+                }
+                if ((!foundClasses || foundClasses.length === 0) && Array.isArray(parsed.classes) && parsed.classes.length > 0) {
+                  foundClasses = parsed.classes;
+                }
+                if ((!foundBookings || foundBookings.length === 0) && Array.isArray(parsed.bookings) && parsed.bookings.length > 0) {
+                  foundBookings = parsed.bookings;
+                }
+                if ((!foundPayments || foundPayments.length === 0) && Array.isArray(parsed.payments) && parsed.payments.length > 0) {
+                  foundPayments = parsed.payments;
+                }
+                if (!foundFinanzas && parsed.finanzas) {
+                  foundFinanzas = parsed.finanzas;
+                }
+              }
+            } catch (err) {
+              console.warn('Error reading key', key, err);
+            }
+          }
+
+          // Fallback scan: check any other keys in localStorage starting with roberto_dashboard
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith('roberto_dashboard') && !allHistoricalKeys.includes(k) && k !== STORAGE_KEY) {
+                const v = localStorage.getItem(k);
+                if (v) {
+                  const p = JSON.parse(v);
+                  if ((!foundTasks || foundTasks.length === 0) && Array.isArray(p.tasks) && p.tasks.length > 0) {
+                    foundTasks = p.tasks;
+                  }
+                  if ((!foundPayments || foundPayments.length === 0) && Array.isArray(p.payments) && p.payments.length > 0) {
+                    foundPayments = p.payments;
+                  }
+                  if (!foundFinanzas && p.finanzas) {
+                    foundFinanzas = p.finanzas;
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+
+          const initialOrFoundPayments = (foundPayments && foundPayments.length > 0) ? foundPayments : INITIAL_DATA.payments;
+          return {
+            ...INITIAL_DATA,
+            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : INITIAL_DATA.tasks,
+            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : INITIAL_DATA.classes,
+            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : INITIAL_DATA.bookings,
+            payments: deduplicatePaymentsList(initialOrFoundPayments),
+            students: INITIAL_DATA.students,
+            finanzas: foundFinanzas || INITIAL_DATA.finanzas
+          };
+        } catch (e) {
+          console.error("Error al leer el estado guardado", e);
+        }
+        return INITIAL_DATA;
+      });
+
+      const [currentTab, setCurrentTab] = useState('overview');
+      const [isDark, setIsDark] = useState(() => localStorage.getItem('roberto_theme') === 'dark');
+      const [toast, setToast] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [modal, setModal] = useState(null);
+
+      // Guardar en localStorage
+      useEffect(() => {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        } catch (e) {
+          console.error("Error de cuota en almacenamiento local", e);
+          showToast("¡Límite de almacenamiento alcanzado! Exporta tus datos.", "error");
+        }
+      }, [data]);
+
+      // Alternar tema
+      useEffect(() => {
+        if (isDark) {
+          document.documentElement.classList.add('dark');
+          localStorage.setItem('roberto_theme', 'dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+          localStorage.setItem('roberto_theme', 'light');
+        }
+      }, [isDark]);
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      // --------------------------------------------------
+      // ACCIONES CRUD
+      // --------------------------------------------------
+
+      // Tareas
+      const toggleTaskStatus = (id) => {
+        setData(prev => ({
+          ...prev,
+          tasks: prev.tasks.map(t => {
+            if (t.id === id) {
+              const nextStatus = t.status === 'completada' ? 'pendiente' : 'completada';
+              return { ...t, status: nextStatus };
+            }
+            return t;
+          })
+        }));
+        showToast("Estado de tarea actualizado");
+      };
+
+      const saveTask = (task) => {
+        setData(prev => {
+          const exists = prev.tasks.some(t => t.id === task.id);
+          const tasks = exists
+            ? prev.tasks.map(t => t.id === task.id ? task : t)
+            : [{ ...task, id: 't-' + Date.now() }, ...prev.tasks];
+          return { ...prev, tasks };
+        });
+        setModal(null);
+        showToast(task.id ? "Tarea guardada" : "Nueva tarea creada");
+      };
+
+      const deleteTask = (id) => {
+        if (confirm("¿Deseas eliminar esta tarea?")) {
+          setData(prev => ({ ...prev, tasks: prev.tasks.filter(t => t.id !== id) }));
+          showToast("Tarea eliminada", "info");
+        }
+      };
+
+      // Clases
+      const saveClass = (cls) => {
+        setData(prev => {
+          const exists = prev.classes.some(c => c.id === cls.id);
+          const classId = exists ? cls.id : 'c-' + Date.now();
+          const autoInvoice = cls.autoInvoice;
+          
+          // Remove autoInvoice from class object
+          const classData = { ...cls };
+          delete classData.autoInvoice;
+          if (!exists) classData.id = classId;
+
+          const classes = exists
+            ? prev.classes.map(c => c.id === classId ? classData : c)
+            : [classData, ...prev.classes];
+
+          let newPayments = [];
+          if (!exists && autoInvoice && classData.enrolledStudentIds && classData.enrolledStudentIds.length > 0) {
+            classData.enrolledStudentIds.forEach((studentId, idx) => {
+              const student = prev.students.find(s => s.id === studentId);
+              if (student) {
+                newPayments.push({
+                  id: 'inv-' + Date.now() + '-' + idx,
+                  invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000),
+                  studentId: student.id,
+                  studentName: student.name,
+                  amount: student.hourlyRate * (classData.durationMinutes / 60),
+                  date: classData.date || new Date().toISOString().slice(0, 10),
+                  dueDate: classData.date || new Date().toISOString().slice(0, 10),
+                  method: 'Transferencia',
+                  status: 'Pendiente',
+                  notes: `Clase: ${classData.name} (${classData.time})`
+                });
+              }
+            });
+          }
+
+          const payments = [...newPayments, ...prev.payments];
+
+          return { ...prev, classes, payments };
+        });
+        setModal(null);
+        showToast("Clase guardada correctamente");
+      };
+
+      const deleteClass = (id) => {
+        if (confirm("¿Estás seguro de que deseas eliminar este horario de clase?")) {
+          setData(prev => ({ ...prev, classes: prev.classes.filter(c => c.id !== id) }));
+          showToast("Clase eliminada", "info");
+        }
+      };
+
+      // Estudiantes
+      const saveStudent = (student) => {
+        setData(prev => {
+          const exists = prev.students.some(s => s.id === student.id);
+          const students = exists
+            ? prev.students.map(s => s.id === student.id ? student : s)
+            : [{ ...student, id: 's-' + Date.now(), balanceDue: Number(student.balanceDue || 0) }, ...prev.students];
+          return { ...prev, students };
+        });
+        setModal(null);
+        showToast("Perfil de estudiante guardado");
+      };
+
+      const deleteStudent = (id) => {
+        if (confirm("¿Eliminar perfil del alumno? Se mantendrán las sesiones pasadas en el registro.")) {
+          setData(prev => ({ ...prev, students: prev.students.filter(s => s.id !== id) }));
+          showToast("Estudiante eliminado", "info");
+        }
+      };
+
+      // Reservas
+      const saveBooking = (booking) => {
+        setData(prev => {
+          const student = prev.students.find(s => s.id === booking.studentId);
+          const studentName = student ? student.name : booking.studentName || 'Alumno';
+          const newBooking = {
+            ...booking,
+            studentName,
+            rate: Number(booking.rate || (student ? student.hourlyRate : 75)),
+            id: booking.id || 'b-' + Date.now()
+          };
+          const exists = prev.bookings.some(b => b.id === booking.id);
+          const bookings = exists
+            ? prev.bookings.map(b => b.id === booking.id ? newBooking : b)
+            : [newBooking, ...prev.bookings];
+          return { ...prev, bookings };
+        });
+        setModal(null);
+        showToast("Sesión registrada");
+      };
+
+      const deleteBooking = (id) => {
+        if (confirm("¿Deseas cancelar y borrar esta reserva?")) {
+          setData(prev => ({ ...prev, bookings: prev.bookings.filter(b => b.id !== id) }));
+          showToast("Reserva eliminada", "info");
+        }
+      };
+
+      // Pagos
+      const savePayment = (payment) => {
+        setData(prev => {
+          const student = prev.students.find(s => s.id === payment.studentId);
+          const studentName = student ? student.name : payment.studentName || 'Alumno';
+          const newPayment = {
+            ...payment,
+            studentName,
+            amount: Number(payment.amount || 0),
+            invoiceNum: payment.invoiceNum || ('FAC-2026-' + Math.floor(100 + Math.random() * 900)),
+            id: payment.id || 'inv-' + Date.now()
+          };
+          const exists = prev.payments.some(p => p.id === payment.id);
+          const payments = exists
+            ? prev.payments.map(p => p.id === payment.id ? newPayment : p)
+            : [newPayment, ...prev.payments];
+          return { ...prev, payments };
+        });
+        setModal(null);
+        showToast("Factura / Pago registrado");
+      };
+
+      const markPaymentPaid = (id) => {
+        setData(prev => ({
+          ...prev,
+          payments: prev.payments.map(p => p.id === id ? { ...p, status: 'Pagado' } : p)
+        }));
+        showToast("¡Pago marcado como Pagado!");
+      };
+
+      const updateClassStatus = (classId, newStatus) => {
+        setData(prev => {
+          const cls = prev.classes.find(c => c.id === classId);
+          const updatedClasses = prev.classes.map(c => c.id === classId ? { ...c, status: newStatus } : c);
+          
+          let updatedPayments = [...prev.payments];
+          
+          if (newStatus === 'Pagada') {
+            // Find existing invoice for this class or create one marked Pagado
+            const hasInv = updatedPayments.some(p => p.notes && p.notes.includes(cls?.name));
+            if (hasInv) {
+              updatedPayments = updatedPayments.map(p => (p.notes && p.notes.includes(cls?.name)) ? { ...p, status: 'Pagado' } : p);
+            } else if (cls && cls.enrolledStudentIds && cls.enrolledStudentIds.length > 0) {
+              cls.enrolledStudentIds.forEach((sId, idx) => {
+                const s = prev.students.find(st => st.id === sId);
+                if (s) {
+                  updatedPayments.unshift({
+                    id: 'inv-' + Date.now() + '-' + idx,
+                    invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
+                    studentId: s.id,
+                    studentName: s.name,
+                    amount: s.hourlyRate * ((cls.durationMinutes || 60) / 60),
+                    date: cls.date || new Date().toISOString().slice(0, 10),
+                    dueDate: cls.date || new Date().toISOString().slice(0, 10),
+                    method: 'Transferencia',
+                    status: 'Pagado',
+                    notes: `Clase: ${cls.name} (${cls.time})`
+                  });
+                }
+              });
+            }
+          } else if (newStatus === 'Pendiente') {
+            // Ensure status is Pendiente
+            const hasInv = updatedPayments.some(p => p.notes && p.notes.includes(cls?.name));
+            if (hasInv) {
+              updatedPayments = updatedPayments.map(p => (p.notes && p.notes.includes(cls?.name)) ? { ...p, status: 'Pendiente' } : p);
+            } else if (cls && cls.enrolledStudentIds && cls.enrolledStudentIds.length > 0) {
+              cls.enrolledStudentIds.forEach((sId, idx) => {
+                const s = prev.students.find(st => st.id === sId);
+                if (s) {
+                  // Check if this student already has an invoice for this class
+                  const alreadyExists = updatedPayments.some(p => p.studentId === s.id && p.notes && p.notes.includes(cls.name));
+                  if (!alreadyExists) {
+                    updatedPayments.unshift({
+                      id: 'inv-' + Date.now() + '-' + idx,
+                      invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
+                      studentId: s.id,
+                      studentName: s.name,
+                      amount: s.hourlyRate * ((cls.durationMinutes || 60) / 60),
+                      date: cls.date || new Date().toISOString().slice(0, 10),
+                      dueDate: cls.date || new Date().toISOString().slice(0, 10),
+                      method: 'Transferencia',
+                      status: 'Pendiente',
+                      notes: `Clase: ${cls.name} (${cls.time})`
+                    });
+                  }
+                }
+              });
+            }
+          }
+          
+          return {
+            ...prev,
+            classes: updatedClasses,
+            payments: updatedPayments
+          };
+        });
+        showToast(`Clase marcada como ${newStatus}`);
+      };
+
+      const deletePayment = (id) => {
+        if (confirm("¿Deseas eliminar este registro de pago?")) {
+          setData(prev => ({ ...prev, payments: prev.payments.filter(p => p.id !== id) }));
+          showToast("Registro eliminado", "info");
+        }
+      };
+
+      const cleanDuplicatePayments = () => {
+        setData(prev => {
+          const clean = deduplicatePaymentsList(prev.payments);
+          const removedCount = prev.payments.length - clean.length;
+          if (removedCount > 0) {
+            showToast(`¡Se eliminaron ${removedCount} factura(s) duplicada(s)!`);
+          } else {
+            showToast("No se encontraron facturas duplicadas", "info");
+          }
+          return { ...prev, payments: clean };
+        });
+      };
+
+      // --------------------------------------------------
+      // COPIA DE SEGURIDAD, RESTAURACIÓN Y LIMPIEZA
+      // --------------------------------------------------
+      const exportJsonBackup = () => {
+        const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(data, null, 2))}`;
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute('href', jsonString);
+        downloadAnchor.setAttribute('download', `respaldo_panel_roberto_${new Date().toISOString().slice(0,10)}.json`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        showToast("¡Copia de seguridad JSON descargada con éxito!");
+      };
+
+      const exportCsv = (type) => {
+        let headers = [];
+        let rows = [];
+        let filename = `roberto_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+
+        if (type === 'pagos') {
+          headers = ['Nº Factura', 'Alumno', 'Importe ($)', 'Fecha Emisión', 'Fecha Límite', 'Método', 'Estado', 'Notas'];
+          rows = data.payments.map(p => [p.invoiceNum, p.studentName, p.amount, p.date, p.dueDate, p.method, p.status, `"${(p.notes||'').replace(/"/g, '""')}"`]);
+        } else if (type === 'reservas') {
+          headers = ['ID', 'Alumno', 'Clase/Materia', 'Fecha', 'Hora', 'Duración (min)', 'Tarifa ($)', 'Estado Reserva', 'Estado Pago'];
+          rows = data.bookings.map(b => [b.id, b.studentName, b.className, b.date, b.time, b.duration, b.rate, b.status, b.paymentStatus]);
+        } else if (type === 'alumnos') {
+          headers = ['ID', 'Nombre', 'Correo', 'Teléfono', 'Tarifa Hora ($)', 'Estado', 'Saldo Pendiente ($)', 'Notas'];
+          rows = data.students.map(s => [s.id, s.name, s.email, s.phone, s.hourlyRate, s.status, s.balanceDue, `"${(s.notes||'').replace(/"/g, '""')}"`]);
+        }
+
+        const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast(`¡${type.toUpperCase()} exportado en CSV!`);
+      };
+
+      const handleJsonImport = (e) => {
+        const fileReader = new FileReader();
+        const file = e.target.files[0];
+        if (!file) return;
+
+        fileReader.onload = (event) => {
+          try {
+            const parsed = JSON.parse(event.target.result);
+            if (parsed.tasks && parsed.classes && parsed.students && parsed.payments) {
+              setData(parsed);
+              showToast("¡Panel restaurado con éxito desde la copia!");
+            } else {
+              showToast("Estructura de archivo no válida.", "error");
+            }
+          } catch (err) {
+            showToast("Error al procesar el archivo JSON.", "error");
+          }
+        };
+        fileReader.readAsText(file);
+        e.target.value = '';
+      };
+
+      const resetToBlank = () => {
+        if (confirm("¿Estás seguro de que deseas vaciar todas las entradas del panel? Se borrarán tareas, clases, alumnos y pagos.")) {
+          setData(INITIAL_DATA);
+          showToast("Panel vaciado completamente. ¡Listo para tus datos!", "info");
+        }
+      };
+
+      // --------------------------------------------------
+      // MÉTRICAS Y KPIS CALCULADOS (SEGUROS CON LISTAS VACÍAS)
+      // --------------------------------------------------
+      const kpis = useMemo(() => {
+        const totalPaid = data.payments
+          .filter(p => p.status === 'Pagado')
+          .reduce((sum, p) => sum + Number(p.amount), 0);
+
+        const totalPending = data.payments
+          .filter(p => p.status === 'Pendiente' || p.status === 'Vencido')
+          .reduce((sum, p) => sum + Number(p.amount), 0);
+
+        const overdueCount = data.payments.filter(p => p.status === 'Vencido').length;
+
+        const activeStudentsCount = data.students.filter(s => s.status === 'Activo').length;
+
+        const totalTeachingHours = data.classes.reduce((sum, c) => sum + (Number(c.durationMinutes) / 60), 0);
+
+        const openTasksCount = data.tasks.filter(t => t.status !== 'completada').length;
+        const urgentTasksCount = data.tasks.filter(t => t.priority === 'Urgente' && t.status !== 'completada').length;
+
+        return {
+          totalPaid,
+          totalPending,
+          overdueCount,
+          activeStudentsCount,
+          totalTeachingHours,
+          openTasksCount,
+          urgentTasksCount
+        };
+      }, [data]);
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* AVISO TOAST */}
+          {toast && (
+            <div className="fixed bottom-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl text-sm font-medium bg-primary text-white dark:bg-accent dark:text-white border border-primary-light animate-bounce">
+              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+              {toast.message}
+            </div>
+          )}
+
+          {/* CABECERA PRINCIPAL */}
+          <header className="sticky top-0 z-30 bg-white/90 dark:bg-primary/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                
+                {/* Marca & Perfil Roberto */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-accent to-accent-light text-white flex items-center justify-center font-bold text-lg shadow-md shadow-accent/20">
+                    R
+                  </div>
+                  <div>
+                    <h1 className="font-bold text-slate-900 dark:text-white leading-tight flex items-center gap-2">
+                      Panel de Roberto
+                      <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/50">Limpio y Privado</span>
+                    </h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Estudio Académico y Clases Privadas</p>
+                  </div>
+                </div>
+
+                {/* Barra de Búsqueda Rápida */}
+                <div className="hidden md:flex items-center relative w-72">
+                  <span className="absolute left-3 text-slate-400"><Icons.Search /></span>
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar tareas, clases, alumnos..."
+                    className="w-full pl-9 pr-4 py-1.5 text-xs rounded-lg bg-slate-100 dark:bg-slate-800 border-none focus:ring-2 focus:ring-accent outline-none placeholder:text-slate-400"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-2.5 text-xs text-slate-400 hover:text-slate-600">✕</button>
+                  )}
+                </div>
+
+                {/* Utilidades / Respaldo, Limpieza y Modo Oscuro */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                    <button
+                      onClick={exportJsonBackup}
+                      title="Descargar copia de seguridad JSON"
+                      className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-accent dark:hover:text-accent-light rounded-md transition-colors"
+                    >
+                      <Icons.Download />
+                    </button>
+                    <label
+                      title="Restaurar copia JSON"
+                      className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-accent dark:hover:text-accent-light rounded-md transition-colors cursor-pointer"
+                    >
+                      <Icons.Upload />
+                      <input type="file" accept=".json" onChange={handleJsonImport} className="hidden" />
+                    </label>
+                    <button
+                      onClick={resetToBlank}
+                      title="Vaciar todo y dejar en blanco"
+                      className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-rose-600 rounded-md transition-colors"
+                    >
+                      <Icons.Trash />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setIsDark(!isDark)}
+                    title={isDark ? "Cambiar a Modo Claro" : "Cambiar a Modo Oscuro"}
+                    className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition"
+                  >
+                    {isDark ? <Icons.Sun /> : <Icons.Moon />}
+                  </button>
+                </div>
+
+              </div>
+
+              {/* Pestañas de Navegación */}
+              <div className="flex space-x-1 sm:space-x-4 overflow-x-auto scrollbar-thin py-1 -mb-px border-t border-slate-100 dark:border-slate-800/80">
+                {[
+                  { id: 'overview', label: 'Vista General', icon: Icons.Dashboard },
+                  { id: 'tasks', label: 'Tareas y Prep', icon: Icons.Tasks, badge: kpis.openTasksCount > 0 ? kpis.openTasksCount : null },
+                  { id: 'classes', label: 'Clases y Horarios', icon: Icons.Classes, badge: data.classes.length > 0 ? data.classes.length : null },
+                  { id: 'students', label: 'Estudiantes y Reservas', icon: Icons.Students, badge: data.students.length > 0 ? data.students.length : null },
+                  { id: 'payments', label: 'Pagos y Facturación', icon: Icons.Payments, badge: kpis.overdueCount ? `${kpis.overdueCount} Vencido` : null, badgeColor: 'bg-rose-500 text-white' },
+                  { id: 'finanzas', label: 'Finanzas Personales', icon: Icons.Payments },
+                  { id: 'reports', label: 'Informes y Métricas', icon: Icons.Reports }
+                ].map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = currentTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setCurrentTab(tab.id)}
+                      className={`flex items-center gap-2 py-2.5 px-3 border-b-2 text-xs sm:text-sm font-semibold whitespace-nowrap transition-all duration-150 ${
+                        isActive
+                          ? 'border-accent text-accent dark:text-accent-light dark:border-accent-light'
+                          : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    >
+                      <Icon />
+                      <span>{tab.label}</span>
+                      {tab.badge !== undefined && tab.badge !== null && (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                          tab.badgeColor || (isActive ? 'bg-accent/10 text-accent dark:bg-accent/20 dark:text-accent-light' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400')
+                        }`}>
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </header>
+
+          {/* VISTAS PRINCIPALES */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            {currentTab === 'overview' && (
+              <OverviewView
+                data={data}
+                kpis={kpis}
+                searchQuery={searchQuery}
+                onOpenModal={setModal}
+                onToggleTask={toggleTaskStatus}
+                onMarkPaid={markPaymentPaid}
+                onUpdateClassStatus={updateClassStatus}
+                onSwitchTab={setCurrentTab}
+              />
+            )}
+
+            {currentTab === 'tasks' && (
+              <TasksView
+                tasks={data.tasks}
+                searchQuery={searchQuery}
+                onOpenModal={setModal}
+                onToggleTask={toggleTaskStatus}
+                onDeleteTask={deleteTask}
+              />
+            )}
+
+            {currentTab === 'classes' && (
+              <ClassesView
+                classes={data.classes}
+                students={data.students}
+                searchQuery={searchQuery}
+                onOpenModal={setModal}
+                onDeleteClass={deleteClass}
+              />
+            )}
+
+            {currentTab === 'students' && (
+              <StudentsView
+                students={data.students}
+                bookings={data.bookings}
+                classes={data.classes}
+                searchQuery={searchQuery}
+                onOpenModal={setModal}
+                onDeleteStudent={deleteStudent}
+                onDeleteBooking={deleteBooking}
+                onExportCsv={exportCsv}
+              />
+            )}
+
+            {currentTab === 'payments' && (
+              <PaymentsView
+                payments={data.payments}
+                students={data.students}
+                searchQuery={searchQuery}
+                onOpenModal={setModal}
+                onMarkPaid={markPaymentPaid}
+                onDeletePayment={deletePayment}
+                onCleanDuplicates={cleanDuplicatePayments}
+                onExportCsv={exportCsv}
+              />
+            )}
+
+            {currentTab === 'finanzas' && (
+              <FinanzasView
+                finanzas={data.finanzas}
+                kpis={kpis}
+                onUpdate={(fin) => setData(d => ({ ...d, finanzas: fin }))}
+              />
+            )}
+
+            {currentTab === 'reports' && (
+              <ReportsView
+                data={data}
+                kpis={kpis}
+                onExportJson={exportJsonBackup}
+                onExportCsv={exportCsv}
+              />
+            )}
+          </main>
+
+          {/* PIE DE PÁGINA */}
+          <footer className="border-t border-slate-200 dark:border-slate-800 py-4 text-center text-xs text-slate-400">
+            Espacio Académico de Roberto • Almacenamiento Local Privado sin Servidores • Todos los datos permanecen 100% en tu dispositivo
+          </footer>
+
+          {/* DIÁLOGO MODAL GLOBAL */}
+          {modal && (
+            <ModalDialog
+              modal={modal}
+              data={data}
+              onClose={() => setModal(null)}
+              onSaveTask={saveTask}
+              onSaveClass={saveClass}
+              onSaveStudent={saveStudent}
+              onSaveBooking={saveBooking}
+              onSavePayment={savePayment}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA 1: VISTA GENERAL
+    // ----------------------------------------------------
+    function OverviewView({ data, kpis, onOpenModal, onToggleTask, onMarkPaid, onUpdateClassStatus, onSwitchTab }) {
+      const fechaHoy = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      // Estado para la fecha seleccionada en el visor de clases diarias
+      const [selectedDate, setSelectedDate] = useState(() => {
+        // Formato YYYY-MM-DD
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      });
+
+      // Navegación de días (+1 / -1)
+      const changeDay = (days) => {
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        dt.setDate(dt.getDate() + days);
+        const ny = dt.getFullYear();
+        const nm = String(dt.getMonth() + 1).padStart(2, '0');
+        const nd = String(dt.getDate()).padStart(2, '0');
+        setSelectedDate(`${ny}-${nm}-${nd}`);
+      };
+
+      // Formato solicitado: "Miercoles 2 Septiembre 2026"
+      const formattedDateTitle = useMemo(() => {
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        return `${days[dt.getDay()]} ${dt.getDate()} ${months[dt.getMonth()]} ${dt.getFullYear()}`;
+      }, [selectedDate]);
+
+      // Filtrar clases del día seleccionado
+      const dayClasses = useMemo(() => {
+        const [y, m, d] = selectedDate.split('-').map(Number);
+        const dt = new Date(y, m - 1, d);
+        const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+        const targetDayName = days[dt.getDay()].toLowerCase();
+
+        return data.classes.filter(cls => {
+          if (cls.date) {
+            return cls.date === selectedDate;
+          }
+          if (cls.dayOfWeek) {
+            return cls.dayOfWeek.toLowerCase() === targetDayName;
+          }
+          return false;
+        });
+      }, [data.classes, selectedDate]);
+
+      const pendingTasks = useMemo(() =>
+        data.tasks.filter(t => t.status !== 'completada').slice(0, 8),
+        [data.tasks]
+      );
+
+      return (
+        <div className="space-y-6">
+          {/* Banner de Bienvenida con mini-tarjetas financieras */}
+          <div className="bg-gradient-to-r from-primary via-primary-light to-accent-dark rounded-2xl p-6 text-white shadow-xl overflow-hidden">
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 text-blue-200 text-xs font-semibold uppercase tracking-wider mb-1">
+                    <Icons.Calendar />
+                    <span className="capitalize">{fechaHoy}</span>
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                    ¡Hola de nuevo, {data.user.name}! 👋
+                  </h2>
+                  <p className="text-sm text-blue-100 mt-1 max-w-xl">
+                    {data.classes.length === 0 && data.tasks.length === 0
+                      ? <span>Tu panel está listo. Agrega tus primeras clases o tareas.</span>
+                      : <span>Tienes <b>{kpis.openTasksCount}</b> tareas activas y <b>{data.classes.length}</b> clases programadas en total.</span>
+                    }
+                  </p>
+                </div>
+                {/* Mini-tarjetas financieras */}
+                <div className="flex flex-wrap gap-3 shrink-0">
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-xl px-4 py-3 min-w-[130px]">
+                    <div className="text-[10px] text-emerald-200 font-semibold uppercase tracking-wide mb-1">Ingresos Cobrados</div>
+                    <div className="text-xl font-extrabold text-white">${kpis.totalPaid.toLocaleString()}</div>
+                    <div className="text-[10px] text-emerald-300 mt-0.5">✓ Clases liquidadas</div>
+                  </div>
+                  <div className="bg-white/10 backdrop-blur border border-white/15 rounded-xl px-4 py-3 min-w-[130px]">
+                    <div className="text-[10px] text-amber-200 font-semibold uppercase tracking-wide mb-1">Cobros Pendientes</div>
+                    <div className="text-xl font-extrabold text-amber-300">${kpis.totalPending.toLocaleString()}</div>
+                    <div className="text-[10px] text-amber-200 mt-0.5">
+                      {kpis.overdueCount > 0
+                        ? <span className="text-rose-300 font-semibold">{kpis.overdueCount} vencida(s)</span>
+                        : 'Sin vencidas'}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {/* Botones de Acción Rápida */}
+              <div className="flex flex-wrap gap-2">
+                <button onClick={() => onOpenModal({ type: 'task' })} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold text-white transition border border-white/10"><Icons.Plus /> Tarea</button>
+                <button onClick={() => onOpenModal({ type: 'class' })} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold text-white transition border border-white/10"><Icons.Plus /> Clase</button>
+                <button onClick={() => onOpenModal({ type: 'student' })} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-semibold text-white transition border border-white/10"><Icons.Plus /> Alumno</button>
+                <button onClick={() => onOpenModal({ type: 'payment' })} className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-xs font-semibold text-white transition shadow-lg shadow-emerald-500/30"><Icons.Plus /> Factura</button>
+              </div>
+            </div>
+          </div>
+
+          {/* Cuadrícula: Tareas (izquierda, ancha) | Clases del Día (derecha, estrecha) */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Tareas Pendientes — ocupa 2/3 */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400"><Icons.Tasks /></span>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Tareas Pendientes</h3>
+                </div>
+                <button onClick={() => onSwitchTab('tasks')} className="text-xs text-accent dark:text-accent-light hover:underline font-semibold">Ver Tablero →</button>
+              </div>
+              {pendingTasks.length === 0 ? (
+                <div className="p-6 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                  <p className="text-xs font-medium text-slate-500 mb-2">¡Todo al día! No hay tareas pendientes.</p>
+                  <button onClick={() => onOpenModal({ type: 'task' })} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-white hover:bg-accent-dark transition"><Icons.Plus /> Nueva tarea</button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {pendingTasks.map(task => (
+                    <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition">
+                      <button onClick={() => onToggleTask(task.id)} className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center transition ${task.status === 'completada' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 dark:border-slate-600 hover:border-accent'}`}>
+                        {task.status === 'completada' && <Icons.Check />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold text-slate-900 dark:text-white">{task.title}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${task.priority === 'Urgente' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' : task.priority === 'Alta' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>{task.priority}</span>
+                          {task.dueDate && <span className="text-[10px] text-slate-400">Fecha: {task.dueDate}</span>}
+                          {task.time && <span className="text-[10px] font-bold text-accent dark:text-accent-light">Hora: {task.time}</span>}
+                        </div>
+                        {task.notes && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{task.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Clases Agendadas del Día — Selector de fecha con flechas */}
+            <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+              <div>
+                {/* Cabecera del cuadro con selector de fecha */}
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-accent/10 dark:bg-accent/20 text-accent dark:text-accent-light">
+                      <Icons.Classes />
+                    </span>
+                    <div>
+                      <h3 className="font-bold text-slate-900 dark:text-white text-xs uppercase tracking-wider">Clases del Día</h3>
+                    </div>
+                  </div>
+                  
+                  {/* Flechas para cambiar de día */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => changeDay(-1)}
+                      title="Día anterior"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                    >
+                      <Icons.ChevronLeft />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const now = new Date();
+                        const y = now.getFullYear();
+                        const m = String(now.getMonth() + 1).padStart(2, '0');
+                        const d = String(now.getDate()).padStart(2, '0');
+                        setSelectedDate(`${y}-${m}-${d}`);
+                      }}
+                      title="Ir a Hoy"
+                      className="px-2 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      onClick={() => changeDay(1)}
+                      title="Día siguiente"
+                      className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition"
+                    >
+                      <Icons.ChevronRight />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Fecha formateada destacada: Miercoles 2 Septiembre 2026 */}
+                <div className="mb-3 text-center sm:text-left bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <div className="text-[11px] text-slate-400 font-medium">Agenda para:</div>
+                  <div className="text-sm font-extrabold text-accent dark:text-accent-light">
+                    {formattedDateTitle}
+                  </div>
+                </div>
+
+                {/* Lista de clases del día */}
+                {dayClasses.length === 0 ? (
+                  <div className="p-5 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl my-2">
+                    <p className="text-xs font-medium text-slate-500 mb-2">No tienes clases agendadas para este día.</p>
+                    <button
+                      onClick={() => onOpenModal({ type: 'class', defaultDate: selectedDate })}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent text-white hover:bg-accent-dark transition"
+                    >
+                      <Icons.Plus /> Agendar clase
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {dayClasses.map(cls => {
+                      const currentStatus = cls.status || 'Programada';
+                      return (
+                        <div
+                          key={cls.id}
+                          className="p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 space-y-2.5 transition"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-1.5 mb-1 flex-wrap">
+                              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-accent/15 text-accent-dark dark:bg-accent/25 dark:text-accent-light">
+                                {cls.subject || 'Tutoría'}
+                              </span>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                currentStatus === 'Pagada'
+                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                                  : currentStatus === 'Suspendida'
+                                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              }`}>
+                                {currentStatus}
+                              </span>
+                            </div>
+                            <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
+                              {cls.name}
+                            </h4>
+                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                              <Icons.Clock /> {cls.time}
+                            </p>
+                          </div>
+
+                          {/* Botones de Acciones Rápidas */}
+                          <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between gap-1">
+                            <span className="text-[10px] font-semibold text-slate-400">Estado:</span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => onUpdateClassStatus(cls.id, 'Pagada')}
+                                title="Marcar como pagada"
+                                className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
+                                  currentStatus === 'Pagada'
+                                    ? 'bg-emerald-600 text-white shadow-sm'
+                                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                }`}
+                              >
+                                Pagada
+                              </button>
+                              <button
+                                onClick={() => onUpdateClassStatus(cls.id, 'Pendiente')}
+                                title="Marcar como pendiente de pago"
+                                className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
+                                  currentStatus === 'Pendiente'
+                                    ? 'bg-amber-600 text-white shadow-sm'
+                                    : 'bg-amber-50 hover:bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                                }`}
+                              >
+                                Pendiente
+                              </button>
+                              <button
+                                onClick={() => onUpdateClassStatus(cls.id, 'Suspendida')}
+                                title="Marcar como suspendida"
+                                className={`px-2 py-1 text-[10px] font-bold rounded-md transition ${
+                                  currentStatus === 'Suspendida'
+                                    ? 'bg-rose-600 text-white shadow-sm'
+                                    : 'bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                                }`}
+                              >
+                                Suspendida
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Pie del cuadro */}
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] text-slate-400">Total: {dayClasses.length} clase(s)</span>
+                <button
+                  onClick={() => onSwitchTab('classes')}
+                  className="text-xs text-accent dark:text-accent-light hover:underline font-semibold"
+                >
+                  Ver Horario Completo →
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // ----------------------------------------------------
+    // PESTAÑA: FINANZAS PERSONALES
+    // ----------------------------------------------------
+    function FinanzasView({ finanzas, kpis, onUpdate }) {
+      const [tab, setTab] = useState('resumen');
+      const [form, setForm] = useState({ concepto: '', monto: '', fecha: new Date().toISOString().slice(0,10), notas: '' });
+      const [deudaForm, setDeudaForm] = useState({ acreedor: '', monto: '', vence: '', notas: '', pagada: false });
+      const [editCapital, setEditCapital] = useState(false);
+      const [capitalVal, setCapitalVal] = useState(finanzas.capitalActual || 0);
+      const [disponibleVal, setDisponibleVal] = useState(finanzas.dineroDisponible || 0);
+
+      const totalOtrosIngresos = useMemo(() =>
+        (finanzas.otrosIngresos || []).reduce((s, i) => s + Number(i.monto), 0), [finanzas.otrosIngresos]);
+      const totalDeudas = useMemo(() =>
+        (finanzas.deudas || []).filter(d => !d.pagada).reduce((s, d) => s + Number(d.monto), 0), [finanzas.deudas]);
+      const totalIngresos = kpis.totalPaid + totalOtrosIngresos;
+
+      function saveCapital() {
+        onUpdate({ ...finanzas, capitalActual: Number(capitalVal), dineroDisponible: Number(disponibleVal) });
+        setEditCapital(false);
+      }
+
+      function addIngreso(e) {
+        e.preventDefault();
+        if (!form.concepto || !form.monto) return;
+        const nuevo = { id: Date.now(), ...form, monto: Number(form.monto) };
+        onUpdate({ ...finanzas, otrosIngresos: [...(finanzas.otrosIngresos || []), nuevo] });
+        setForm({ concepto: '', monto: '', fecha: new Date().toISOString().slice(0,10), notas: '' });
+      }
+
+      function removeIngreso(id) {
+        onUpdate({ ...finanzas, otrosIngresos: finanzas.otrosIngresos.filter(i => i.id !== id) });
+      }
+
+      function addDeuda(e) {
+        e.preventDefault();
+        if (!deudaForm.acreedor || !deudaForm.monto) return;
+        const nueva = { id: Date.now(), ...deudaForm, monto: Number(deudaForm.monto) };
+        onUpdate({ ...finanzas, deudas: [...(finanzas.deudas || []), nueva] });
+        setDeudaForm({ acreedor: '', monto: '', vence: '', notas: '', pagada: false });
+      }
+
+      function toggleDeudaPagada(id) {
+        onUpdate({ ...finanzas, deudas: finanzas.deudas.map(d => d.id === id ? { ...d, pagada: !d.pagada } : d) });
+      }
+
+      function removeDeuda(id) {
+        onUpdate({ ...finanzas, deudas: finanzas.deudas.filter(d => d.id !== id) });
+      }
+
+      const tabs = [
+        { id: 'resumen', label: 'Resumen' },
+        { id: 'ingresos', label: 'Otros Ingresos' },
+        { id: 'deudas', label: 'Deudas' },
+      ];
+
+      return (
+        <div className="space-y-6">
+          {/* Título */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Finanzas Personales</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Control de capital, deudas e ingresos adicionales</p>
+            </div>
+          </div>
+
+          {/* Tarjetas de resumen */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-500 font-medium mb-1">Capital Actual</div>
+              <div className="text-xl font-extrabold text-slate-900 dark:text-white">${(finanzas.capitalActual || 0).toLocaleString()}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Patrimonio total</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-500 font-medium mb-1">Dinero Disponible</div>
+              <div className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400">${(finanzas.dineroDisponible || 0).toLocaleString()}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Liquidez actual</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-500 font-medium mb-1">Ingresos Totales</div>
+              <div className="text-xl font-extrabold text-accent dark:text-accent-light">${totalIngresos.toLocaleString()}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">Clases + otros</div>
+            </div>
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-500 font-medium mb-1">Deudas Pendientes</div>
+              <div className="text-xl font-extrabold text-rose-600 dark:text-rose-400">${totalDeudas.toLocaleString()}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{(finanzas.deudas || []).filter(d => !d.pagada).length} deuda(s) activa(s)</div>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="border-b border-slate-200 dark:border-slate-800">
+            <div className="flex gap-4">
+              {tabs.map(t => (
+                <button key={t.id} onClick={() => setTab(t.id)}
+                  className={`py-2 px-1 text-sm font-semibold border-b-2 transition ${tab === t.id ? 'border-accent text-accent dark:text-accent-light dark:border-accent-light' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* RESUMEN */}
+          {tab === 'resumen' && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Editar capital y disponible */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Mi Capital y Liquidez</h3>
+                  {!editCapital && (
+                    <button onClick={() => { setCapitalVal(finanzas.capitalActual || 0); setDisponibleVal(finanzas.dineroDisponible || 0); setEditCapital(true); }}
+                      className="text-xs text-accent dark:text-accent-light hover:underline font-semibold">Editar</button>
+                  )}
+                </div>
+                {editCapital ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Capital Actual (patrimonio total)</label>
+                      <input type="number" value={capitalVal} onChange={e => setCapitalVal(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Dinero Disponible (liquidez)</label>
+                      <input type="number" value={disponibleVal} onChange={e => setDisponibleVal(e.target.value)}
+                        className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={saveCapital} className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white text-xs font-bold transition">Guardar</button>
+                      <button onClick={() => setEditCapital(false)} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-bold transition">Cancelar</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                      <span className="text-sm text-slate-600 dark:text-slate-300">Capital (Patrimonio)</span>
+                      <span className="font-extrabold text-slate-900 dark:text-white">${(finanzas.capitalActual || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                      <span className="text-sm text-slate-600 dark:text-slate-300">Disponible (Liquidez)</span>
+                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400">${(finanzas.dineroDisponible || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-rose-50 dark:bg-rose-950/50">
+                      <span className="text-sm text-slate-600 dark:text-slate-300">Deudas Activas</span>
+                      <span className="font-extrabold text-rose-600 dark:text-rose-400">-${totalDeudas.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border-t border-emerald-200 dark:border-emerald-900">
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Balance Neto</span>
+                      <span className={`font-extrabold text-lg ${(finanzas.dineroDisponible||0) - totalDeudas >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                        ${((finanzas.dineroDisponible || 0) - totalDeudas).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Desglose de ingresos */}
+              <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">Desglose de Ingresos</h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Clases cobradas</span>
+                    <span className="font-bold text-accent dark:text-accent-light">${kpis.totalPaid.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Clases pendientes</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400">${kpis.totalPending.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                    <span className="text-sm text-slate-600 dark:text-slate-300">Otros ingresos</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400">${totalOtrosIngresos.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-accent/10 dark:bg-accent/20 border border-accent/20">
+                    <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Total Ingresos</span>
+                    <span className="font-extrabold text-accent dark:text-accent-light text-lg">${totalIngresos.toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* OTROS INGRESOS */}
+          {tab === 'ingresos' && (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Formulario */}
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">Registrar Ingreso</h3>
+                <form onSubmit={addIngreso} className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Concepto</label>
+                    <input value={form.concepto} onChange={e => setForm({...form, concepto: e.target.value})} placeholder="ej. Consultoría, Freelance…"
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Monto</label>
+                    <input type="number" value={form.monto} onChange={e => setForm({...form, monto: e.target.value})} placeholder="0"
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Fecha</label>
+                    <input type="date" value={form.fecha} onChange={e => setForm({...form, fecha: e.target.value})}
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Notas (opcional)</label>
+                    <input value={form.notas} onChange={e => setForm({...form, notas: e.target.value})} placeholder="Detalle adicional…"
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <button type="submit" className="w-full py-2 rounded-lg bg-accent hover:bg-accent-dark text-white text-xs font-bold transition">+ Agregar Ingreso</button>
+                </form>
+              </div>
+              {/* Lista */}
+              <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Otros Ingresos</h3>
+                  <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">Total: ${totalOtrosIngresos.toLocaleString()}</span>
+                </div>
+                {(finanzas.otrosIngresos || []).length === 0 ? (
+                  <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                    <p className="text-xs text-slate-500">Aún no has registrado otros ingresos.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {[...(finanzas.otrosIngresos || [])].reverse().map(ing => (
+                      <div key={ing.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900 dark:text-white">{ing.concepto}</div>
+                          <div className="text-[11px] text-slate-400">{ing.fecha}{ing.notas ? ` • ${ing.notas}` : ''}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="font-extrabold text-emerald-600 dark:text-emerald-400">${Number(ing.monto).toLocaleString()}</span>
+                          <button onClick={() => removeIngreso(ing.id)} className="text-slate-400 hover:text-rose-500 transition text-xs">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* DEUDAS */}
+          {tab === 'deudas' && (
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+              {/* Formulario */}
+              <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <h3 className="font-bold text-slate-900 dark:text-white text-base mb-4">Registrar Deuda</h3>
+                <form onSubmit={addDeuda} className="space-y-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Acreedor / Concepto</label>
+                    <input value={deudaForm.acreedor} onChange={e => setDeudaForm({...deudaForm, acreedor: e.target.value})} placeholder="ej. Banco, Tarjeta, Persona…"
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Monto</label>
+                    <input type="number" value={deudaForm.monto} onChange={e => setDeudaForm({...deudaForm, monto: e.target.value})} placeholder="0"
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Fecha de Vencimiento</label>
+                    <input type="date" value={deudaForm.vence} onChange={e => setDeudaForm({...deudaForm, vence: e.target.value})}
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 dark:text-slate-300">Notas</label>
+                    <input value={deudaForm.notas} onChange={e => setDeudaForm({...deudaForm, notas: e.target.value})} placeholder="Cuotas, interés, etc."
+                      className="mt-1 w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border-none text-sm focus:ring-2 focus:ring-accent outline-none" />
+                  </div>
+                  <button type="submit" className="w-full py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition">+ Agregar Deuda</button>
+                </form>
+              </div>
+              {/* Lista */}
+              <div className="lg:col-span-3 bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Deudas Registradas</h3>
+                  <span className="text-xs font-bold text-rose-600 dark:text-rose-400">Pendiente: ${totalDeudas.toLocaleString()}</span>
+                </div>
+                {(finanzas.deudas || []).length === 0 ? (
+                  <div className="p-8 text-center border border-dashed border-slate-200 dark:border-slate-800 rounded-xl">
+                    <p className="text-xs text-slate-500">No tienes deudas registradas. ¡Excelente!</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(finanzas.deudas || []).map(d => (
+                      <div key={d.id} className={`flex items-center justify-between p-3 rounded-lg border ${d.pagada ? 'border-slate-100 dark:border-slate-800 opacity-50' : 'border-rose-200 dark:border-rose-900 bg-rose-50/50 dark:bg-rose-950/30'}`}>
+                        <div className="flex items-center gap-3">
+                          <input type="checkbox" checked={d.pagada} onChange={() => toggleDeudaPagada(d.id)} className="accent-emerald-500 w-4 h-4 cursor-pointer" />
+                          <div>
+                            <div className={`text-sm font-semibold ${d.pagada ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>{d.acreedor}</div>
+                            <div className="text-[11px] text-slate-400">{d.vence ? `Vence: ${d.vence}` : 'Sin fecha'}{d.notas ? ` • ${d.notas}` : ''}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className={`font-extrabold ${d.pagada ? 'text-slate-400 line-through' : 'text-rose-600 dark:text-rose-400'}`}>${Number(d.monto).toLocaleString()}</span>
+                          <button onClick={() => removeDeuda(d.id)} className="text-slate-400 hover:text-rose-500 transition text-xs">✕</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // PESTAÑA 2: TAREAS Y PREPARACIÓN
+    // ----------------------------------------------------
+    function TasksView({ tasks, searchQuery, onOpenModal, onToggleTask, onDeleteTask }) {
+      const [filterCategory, setFilterCategory] = useState('Todas');
+      const [filterPriority, setFilterPriority] = useState('Todas');
+      const [filterStatus, setFilterStatus] = useState('Todas');
+
+      const categories = ['Todas', 'Preparación', 'Calificaciones', 'Administración', 'Seguimiento', 'Currículo', 'Personal'];
+      const priorities = ['Todas', 'Urgente', 'Alta', 'Media', 'Baja'];
+      const statuses = [
+        { id: 'Todas', label: 'Todas' },
+        { id: 'pendiente', label: 'Pendientes' },
+        { id: 'en_progreso', label: 'En Progreso' },
+        { id: 'completada', label: 'Completadas' }
+      ];
+
+      const filteredTasks = useMemo(() => {
+        return tasks.filter(t => {
+          if (filterCategory !== 'Todas' && t.category !== filterCategory) return false;
+          if (filterPriority !== 'Todas' && t.priority !== filterPriority) return false;
+          if (filterStatus !== 'Todas' && t.status !== filterStatus) return false;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            return t.title.toLowerCase().includes(q) || (t.notes && t.notes.toLowerCase().includes(q));
+          }
+          return true;
+        });
+      }, [tasks, filterCategory, filterPriority, filterStatus, searchQuery]);
+
+      const completedCount = tasks.filter(t => t.status === 'completada').length;
+      const progressPercent = tasks.length > 0 ? Math.round((completedCount / tasks.length) * 100) : 0;
+
+      return (
+        <div className="space-y-6">
+          {/* Cabecera */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                Gestión de Tareas y Preparación de Clases
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Organiza la preparación de lecciones, correcciones, notas y tareas administrativas.
+              </p>
+            </div>
+            <button
+              onClick={() => onOpenModal({ type: 'task' })}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+            >
+              <Icons.Plus /> Nueva Tarea
+            </button>
+          </div>
+
+          {/* Barra de Progreso */}
+          {tasks.length > 0 && (
+            <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex-1">
+                <div className="flex items-center justify-between text-xs font-semibold mb-1.5">
+                  <span>Progreso de Tareas Completadas</span>
+                  <span>{completedCount} de {tasks.length} Completadas ({progressPercent}%)</span>
+                </div>
+                <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-accent to-emerald-500 transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Filtros */}
+          <div className="flex flex-wrap items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Categoría:</span>
+              <select
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border-none font-medium focus:ring-2 focus:ring-accent outline-none"
+              >
+                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Prioridad:</span>
+              <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border-none font-medium focus:ring-2 focus:ring-accent outline-none"
+              >
+                {priorities.map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Estado:</span>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 border-none font-medium focus:ring-2 focus:ring-accent outline-none"
+              >
+                {statuses.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Lista de Tareas */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            {filteredTasks.length === 0 ? (
+              <div className="p-12 text-center">
+                <Icons.EmptyBox />
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay tareas pendientes</p>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Empieza organizando tu semana y planificando tus próximas lecciones.</p>
+                <button
+                  onClick={() => onOpenModal({ type: 'task' })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
+                >
+                  <Icons.Plus /> Crear mi primera tarea
+                </button>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                {filteredTasks.map(task => {
+                  const isCompleted = task.status === 'completada';
+                  return (
+                    <div
+                      key={task.id}
+                      className={`p-4 flex items-start justify-between gap-4 transition ${
+                        isCompleted ? 'bg-slate-50/50 dark:bg-slate-900/40 opacity-70' : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                        <button
+                          onClick={() => onToggleTask(task.id)}
+                          className={`mt-1 w-5 h-5 rounded-md border flex items-center justify-center transition shrink-0 ${
+                            isCompleted
+                              ? 'bg-emerald-500 border-emerald-500 text-white'
+                              : 'border-slate-300 dark:border-slate-600 hover:border-accent'
+                          }`}
+                        >
+                          {isCompleted && <Icons.Check />}
+                        </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className={`text-sm font-semibold text-slate-900 dark:text-white ${isCompleted ? 'line-through text-slate-400 dark:text-slate-500' : ''}`}>
+                              {task.title}
+                            </h4>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {task.category}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              task.priority === 'Urgente'
+                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                                : task.priority === 'Alta'
+                                ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                                : task.priority === 'Media'
+                                ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>
+                              {task.priority}
+                            </span>
+                          </div>
+                          {task.notes && (
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                              {task.notes}
+                            </p>
+                          )}
+                          <div className="flex flex-wrap items-center gap-4 text-[11px] text-slate-400 mt-2">
+                            <span className="flex items-center gap-1">
+                              <Icons.Calendar /> Fecha: {task.dueDate || 'Sin fecha'}
+                            </span>
+                            {task.time && (
+                              <span className="flex items-center gap-1 font-bold text-accent dark:text-accent-light">
+                                <Icons.Clock /> Hora: {task.time}
+                              </span>
+                            )}
+                            <span>Estado: <strong className="capitalize text-slate-600 dark:text-slate-300">{task.status.replace('_', ' ')}</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => onOpenModal({ type: 'task', item: task })}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => onDeleteTask(task.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 transition"
+                          title="Eliminar tarea"
+                        >
+                          <Icons.Trash />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA 3: CLASES Y HORARIOS
+    // ----------------------------------------------------
+    function ClassesView({ classes, students, searchQuery, onOpenModal, onDeleteClass }) {
+      const studentMap = useMemo(() => {
+        return new Map(students.map(s => [s.id, s.name]));
+      }, [students]);
+
+      const filteredClasses = useMemo(() => {
+        return classes.filter(c => {
+          if (!searchQuery) return true;
+          const q = searchQuery.toLowerCase();
+          return c.name.toLowerCase().includes(q) || c.subject.toLowerCase().includes(q) || (c.description && c.description.toLowerCase().includes(q));
+        });
+      }, [classes, searchQuery]);
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                Horario de Clases y Oferta Académica
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Administra talleres en grupo, clases regulares, alumnos inscritos y enlaces de reunión.
+              </p>
+            </div>
+            <button
+              onClick={() => onOpenModal({ type: 'class' })}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+            >
+              <Icons.Plus /> Programar Nueva Clase
+            </button>
+          </div>
+
+          {filteredClasses.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <Icons.EmptyBox />
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay clases programadas</h3>
+              <p className="text-xs text-slate-500 mt-1 mb-4">Configura tus asignaturas, días y horarios de clase habituales.</p>
+              <button
+                onClick={() => onOpenModal({ type: 'class' })}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
+              >
+                <Icons.Plus /> Añadir mi primera clase
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {filteredClasses.map(cls => {
+                const enrolledCount = (cls.enrolledStudentIds || []).length;
+                return (
+                  <div
+                    key={cls.id}
+                    className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between"
+                  >
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-xs font-bold px-2.5 py-0.5 rounded-md bg-accent/10 text-accent-dark dark:bg-accent/20 dark:text-accent-light border border-accent/20 dark:border-accent/30">
+                          {cls.subject}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {cls.status}
+                          </span>
+                          <button
+                            onClick={() => onOpenModal({ type: 'class', item: cls })}
+                            className="text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1"
+                            title="Editar"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            onClick={() => onDeleteClass(cls.id)}
+                            className="text-xs text-slate-400 hover:text-rose-500 p-1"
+                            title="Eliminar"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                          {cls.name}
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          {cls.description}
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-xs text-slate-600 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center gap-1.5">
+                          <Icons.Calendar />
+                          <span>{cls.dayOfWeek}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Icons.Clock />
+                          <span>{cls.time} ({cls.durationMinutes} min)</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <div className="text-[11px] font-semibold text-slate-400 mb-1.5 flex justify-between">
+                          <span>Alumnos Inscritos</span>
+                          <span>{enrolledCount} / {cls.capacity} cupos</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {enrolledCount === 0 ? (
+                            <span className="text-[11px] text-slate-400 italic">Sin alumnos inscritos</span>
+                          ) : (
+                            (cls.enrolledStudentIds || []).map(sid => (
+                              <span key={sid} className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
+                                {studentMap.get(sid) || sid}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <span className="text-xs text-slate-400">Modalidad: Regular</span>
+                      {cls.location && (
+                        <a
+                          href={cls.location}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent hover:bg-accent-dark text-white transition shadow-sm"
+                        >
+                          Unirse a Clase <Icons.ExternalLink />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA 4: ESTUDIANTES Y RESERVAS
+    // ----------------------------------------------------
+    function StudentsView({ students, bookings, classes, searchQuery, onOpenModal, onDeleteStudent, onDeleteBooking, onExportCsv }) {
+      const [activeSubTab, setActiveSubTab] = useState('roster');
+
+      const filteredStudents = useMemo(() => {
+        return students.filter(s => {
+          if (!searchQuery) return true;
+          const q = searchQuery.toLowerCase();
+          return s.name.toLowerCase().includes(q) || (s.email && s.email.toLowerCase().includes(q)) || (s.notes && s.notes.toLowerCase().includes(q));
+        });
+      }, [students, searchQuery]);
+
+      const filteredBookings = useMemo(() => {
+        return bookings.filter(b => {
+          if (!searchQuery) return true;
+          const q = searchQuery.toLowerCase();
+          return b.studentName.toLowerCase().includes(q) || (b.className && b.className.toLowerCase().includes(q));
+        });
+      }, [bookings, searchQuery]);
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                Estudiantes y Sesiones de Clase
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Directorio de alumnos, tarifas por hora, registro de sesiones individuales y asistencia.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onExportCsv(activeSubTab === 'roster' ? 'alumnos' : 'reservas')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition"
+              >
+                <Icons.Download /> Exportar CSV
+              </button>
+              {activeSubTab === 'roster' ? (
+                <button
+                  onClick={() => onOpenModal({ type: 'student' })}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+                >
+                  <Icons.Plus /> Nuevo Alumno
+                </button>
+              ) : (
+                <button
+                  onClick={() => onOpenModal({ type: 'booking' })}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+                >
+                  <Icons.Plus /> Reservar Sesión
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Subpestañas */}
+          <div className="flex border-b border-slate-200 dark:border-slate-800 space-x-6">
+            <button
+              onClick={() => setActiveSubTab('roster')}
+              className={`pb-3 text-sm font-bold border-b-2 transition ${
+                activeSubTab === 'roster'
+                  ? 'border-accent text-accent dark:border-accent-light dark:text-accent-light'
+                  : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Directorio de Alumnos ({students.length})
+            </button>
+            <button
+              onClick={() => setActiveSubTab('bookings')}
+              className={`pb-3 text-sm font-bold border-b-2 transition ${
+                activeSubTab === 'bookings'
+                  ? 'border-accent text-accent dark:border-accent-light dark:text-accent-light'
+                  : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+              }`}
+            >
+              Registro de Sesiones ({bookings.length})
+            </button>
+          </div>
+
+          {/* Subpestaña 1: Directorio */}
+          {activeSubTab === 'roster' && (
+            <div>
+              {filteredStudents.length === 0 ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl p-12 text-center border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                  <Icons.EmptyBox />
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay alumnos registrados</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">Añade a tus alumnos para registrar sus tarifas, datos de contacto y progreso.</p>
+                  <button
+                    onClick={() => onOpenModal({ type: 'student' })}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
+                  >
+                    <Icons.Plus /> Registrar mi primer alumno
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredStudents.map(student => (
+                    <div
+                      key={student.id}
+                      className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h3 className="font-bold text-base text-slate-900 dark:text-white">
+                              {student.name}
+                            </h3>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
+                              student.status === 'Activo'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
+                            }`}>
+                              {student.status}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-extrabold text-accent dark:text-accent-light">
+                              ${student.hourlyRate}/h
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-1 text-xs text-slate-500 dark:text-slate-400">
+                          {student.email && <p>📧 {student.email}</p>}
+                          {student.phone && <p>📱 {student.phone}</p>}
+                        </div>
+
+                        {student.notes && (
+                          <div className="mt-3 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 text-xs text-slate-600 dark:text-slate-300 italic">
+                            "{student.notes}"
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                        <div>
+                          {student.balanceDue > 0 ? (
+                            <span className="text-xs font-bold text-rose-500">Saldo: ${student.balanceDue}</span>
+                          ) : (
+                            <span className="text-xs font-bold text-emerald-500">Sin saldo pendiente</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => onOpenModal({ type: 'student', item: student })}
+                            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => onDeleteStudent(student.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 transition"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Subpestaña 2: Registro de Reservas */}
+          {activeSubTab === 'bookings' && (
+            <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-x-auto">
+              {filteredBookings.length === 0 ? (
+                <div className="p-12 text-center">
+                  <Icons.EmptyBox />
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay reservas registradas</h3>
+                  <p className="text-xs text-slate-500 mt-1 mb-4">Agenda sesiones individuales de tutoría o clases prácticas.</p>
+                  <button
+                    onClick={() => onOpenModal({ type: 'booking' })}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
+                  >
+                    <Icons.Plus /> Registrar primera reserva
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 uppercase font-semibold">
+                    <tr>
+                      <th className="p-3.5">Alumno</th>
+                      <th className="p-3.5">Sesión / Clase</th>
+                      <th className="p-3.5">Fecha y Hora</th>
+                      <th className="p-3.5">Duración</th>
+                      <th className="p-3.5">Tarifa</th>
+                      <th className="p-3.5">Estado Reserva</th>
+                      <th className="p-3.5">Estado Pago</th>
+                      <th className="p-3.5 text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredBookings.map(b => (
+                      <tr key={b.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">{b.studentName}</td>
+                        <td className="p-3.5 text-slate-600 dark:text-slate-300">{b.className}</td>
+                        <td className="p-3.5 text-slate-500">{b.date} a las {b.time}</td>
+                        <td className="p-3.5 text-slate-500">{b.duration} min</td>
+                        <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200">${b.rate}</td>
+                        <td className="p-3.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            b.status === 'Confirmada' ? 'bg-accent/10 text-accent-dark dark:bg-accent/20 dark:text-accent-light' :
+                            b.status === 'Completada' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                            'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                          }`}>
+                            {b.status}
+                          </span>
+                        </td>
+                        <td className="p-3.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            b.paymentStatus === 'Pagado' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                            b.paymentStatus === 'Vencido' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                            'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                          }`}>
+                            {b.paymentStatus}
+                          </span>
+                        </td>
+                        <td className="p-3.5 text-right space-x-1.5">
+                          <button
+                            onClick={() => onOpenModal({ type: 'booking', item: b })}
+                            className="text-xs text-accent dark:text-accent-light hover:underline font-semibold"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => onDeleteBooking(b.id)}
+                            className="text-xs text-slate-400 hover:text-rose-500 p-1"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA 5: PAGOS Y FACTURACIÓN
+    // ----------------------------------------------------
+    function PaymentsView({ payments, students, searchQuery, onOpenModal, onMarkPaid, onDeletePayment, onCleanDuplicates, onExportCsv }) {
+      const [filterStatus, setFilterStatus] = useState('Todos');
+
+      const filteredPayments = useMemo(() => {
+        return payments.filter(p => {
+          if (filterStatus !== 'Todos' && p.status !== filterStatus) return false;
+          if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            return p.studentName.toLowerCase().includes(q) || p.invoiceNum.toLowerCase().includes(q) || (p.notes && p.notes.toLowerCase().includes(q));
+          }
+          return true;
+        });
+      }, [payments, filterStatus, searchQuery]);
+
+      const totalPaid = payments.filter(p => p.status === 'Pagado').reduce((a, b) => a + Number(b.amount), 0);
+      const totalPending = payments.filter(p => p.status === 'Pendiente').reduce((a, b) => a + Number(b.amount), 0);
+      const totalOverdue = payments.filter(p => p.status === 'Vencido').reduce((a, b) => a + Number(b.amount), 0);
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                Pagos y Facturación
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Control de cobros de matrícula, emisión de recibos y exportación para contabilidad.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={onCleanDuplicates}
+                title="Eliminar facturas que tengan el mismo alumno, monto y concepto"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 transition"
+              >
+                <Icons.Refresh /> Limpiar Duplicados
+              </button>
+              <button
+                onClick={() => onExportCsv('pagos')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition"
+              >
+                <Icons.Download /> Exportar CSV
+              </button>
+              <button
+                onClick={() => onOpenModal({ type: 'payment' })}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+              >
+                <Icons.Plus /> Registrar Pago / Factura
+              </button>
+            </div>
+          </div>
+
+          {/* Tarjetas de Resumen Financiero */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 p-4 rounded-xl">
+              <div className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Total Cobrado</div>
+              <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-1">${totalPaid.toLocaleString()}</div>
+              <div className="text-[11px] text-emerald-600 dark:text-emerald-500 mt-0.5">Ingresos liquidados</div>
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 p-4 rounded-xl">
+              <div className="text-xs font-bold text-amber-800 dark:text-amber-300">Facturas Pendientes</div>
+              <div className="text-2xl font-extrabold text-amber-700 dark:text-amber-400 mt-1">${totalPending.toLocaleString()}</div>
+              <div className="text-[11px] text-amber-600 dark:text-amber-500 mt-0.5">Pendiente de cobro</div>
+            </div>
+
+            <div className="bg-rose-50 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-800/60 p-4 rounded-xl">
+              <div className="text-xs font-bold text-rose-800 dark:text-rose-300">Facturas Vencidas</div>
+              <div className="text-2xl font-extrabold text-rose-700 dark:text-rose-400 mt-1">${totalOverdue.toLocaleString()}</div>
+              <div className="text-[11px] text-rose-600 dark:text-rose-500 mt-0.5">Requiere recordatorio de pago</div>
+            </div>
+          </div>
+
+          {/* Filtro de Estado */}
+          <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/80 dark:border-slate-800 text-xs">
+            <span className="text-slate-400 font-semibold px-1">Filtrar Estado:</span>
+            {['Todos', 'Pagado', 'Pendiente', 'Vencido'].map(st => (
+              <button
+                key={st}
+                onClick={() => setFilterStatus(st)}
+                className={`px-3 py-1 rounded-lg font-semibold transition ${
+                  filterStatus === st
+                    ? 'bg-accent text-white'
+                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* Tabla de Facturación */}
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-x-auto">
+            {filteredPayments.length === 0 ? (
+              <div className="p-12 text-center">
+                <Icons.EmptyBox />
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay pagos ni facturas</h3>
+                <p className="text-xs text-slate-500 mt-1 mb-4">Emite tus primeras facturas o anota cobros recibidos por Bizum, transferencia o efectivo.</p>
+                <button
+                  onClick={() => onOpenModal({ type: 'payment' })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition shadow-sm"
+                >
+                  <Icons.Plus /> Registrar primera factura
+                </button>
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 text-slate-500 uppercase font-semibold">
+                  <tr>
+                    <th className="p-3.5">Nº Factura</th>
+                    <th className="p-3.5">Alumno</th>
+                    <th className="p-3.5">Importe</th>
+                    <th className="p-3.5">Fecha Emisión</th>
+                    <th className="p-3.5">Fecha Límite</th>
+                    <th className="p-3.5">Método</th>
+                    <th className="p-3.5">Estado</th>
+                    <th className="p-3.5">Concepto</th>
+                    <th className="p-3.5 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredPayments.map(p => (
+                    <tr key={p.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                      <td className="p-3.5 font-mono font-bold text-slate-900 dark:text-white">{p.invoiceNum}</td>
+                      <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200">{p.studentName}</td>
+                      <td className="p-3.5 font-extrabold text-slate-900 dark:text-white">${p.amount}</td>
+                      <td className="p-3.5 text-slate-500">{p.date}</td>
+                      <td className="p-3.5 text-slate-500">{p.dueDate || '—'}</td>
+                      <td className="p-3.5 font-medium text-slate-600 dark:text-slate-300">{p.method}</td>
+                      <td className="p-3.5">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          p.status === 'Pagado' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                          p.status === 'Vencido' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                          'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </td>
+                      <td className="p-3.5 text-slate-500 max-w-xs truncate">{p.notes || '—'}</td>
+                      <td className="p-3.5 text-right space-x-2">
+                        {p.status !== 'Pagado' && (
+                          <button
+                            onClick={() => onMarkPaid(p.id)}
+                            className="px-2 py-1 bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300 rounded font-bold hover:bg-emerald-200 transition"
+                          >
+                            Marcar Pagado
+                          </button>
+                        )}
+                        <button
+                          onClick={() => onOpenModal({ type: 'payment', item: p })}
+                          className="text-accent dark:text-accent-light hover:underline font-semibold"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => onDeletePayment(p.id)}
+                          className="text-slate-400 hover:text-rose-500"
+                        >
+                          <Icons.Trash />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA 6: INFORMES Y RENDIMIENTO
+    // ----------------------------------------------------
+    function ReportsView({ data, kpis, onExportJson, onExportCsv }) {
+      const subjectDistribution = useMemo(() => {
+        const counts = {};
+        data.classes.forEach(c => {
+          counts[c.subject] = (counts[c.subject] || 0) + (Number(c.durationMinutes) / 60);
+        });
+        return Object.entries(counts);
+      }, [data.classes]);
+
+      const studentRevenue = useMemo(() => {
+        const map = {};
+        data.payments.forEach(p => {
+          map[p.studentName] = (map[p.studentName] || 0) + Number(p.amount);
+        });
+        return Object.entries(map).sort((a, b) => b[1] - a[1]);
+      }, [data.payments]);
+
+      return (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
+                Informes y Rendimiento Académico
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                Métricas financieras consolidadas, distribución horaria y valor acumulado por alumno.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onExportJson}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 transition"
+              >
+                <Icons.Download /> Descargar Respaldo JSON
+              </button>
+              <button
+                onClick={() => onExportCsv('pagos')}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-md shadow-accent/20"
+              >
+                <Icons.Download /> Exportar Pagos CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Tarjetas de Métricas de Alto Nivel */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-400 font-semibold">Total Facturado</div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white mt-1.5">
+                ${(kpis.totalPaid + kpis.totalPending).toLocaleString()}
+              </div>
+              <div className="text-[11px] text-emerald-500 mt-1 font-medium">
+                ${kpis.totalPaid.toLocaleString()} cobrado
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-400 font-semibold">Ingreso Medio por Sesión</div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white mt-1.5">
+                ${data.bookings.length > 0 ? Math.round(kpis.totalPaid / data.bookings.length) : 0}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">Por sesión reservada</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-400 font-semibold">Horas Docentes Totales</div>
+              <div className="text-2xl font-black text-slate-900 dark:text-white mt-1.5">
+                {kpis.totalTeachingHours.toFixed(1)} h
+              </div>
+              <div className="text-[11px] text-accent mt-1">En todas las materias activas</div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <div className="text-xs text-slate-400 font-semibold">Rendimiento por Hora</div>
+              <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1.5">
+                ${kpis.totalTeachingHours > 0 ? Math.round(kpis.totalPaid / kpis.totalTeachingHours) : 0}/h
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">Tarifa base: ${data.user.hourlyRate}/h</div>
+            </div>
+          </div>
+
+          {/* Gráficos */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Distribución de Horas por Materia */}
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-4">
+                Horas Semanales Impartidas por Materia
+              </h3>
+              {subjectDistribution.length === 0 ? (
+                <p className="text-xs text-slate-400 py-8 text-center italic">No hay clases registradas aún.</p>
+              ) : (
+                <div className="space-y-4">
+                  {subjectDistribution.map(([subject, hours]) => {
+                    const maxHours = Math.max(...subjectDistribution.map(s => s[1]), 5);
+                    const pct = Math.min(100, Math.round((hours / maxHours) * 100));
+                    return (
+                      <div key={subject}>
+                        <div className="flex justify-between text-xs font-semibold mb-1">
+                          <span className="text-slate-700 dark:text-slate-300">{subject}</span>
+                          <span className="text-accent dark:text-accent-light">{hours.toFixed(1)} h/semana</span>
+                        </div>
+                        <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-accent rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Ranking de Alumnos */}
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+              <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-4">
+                Ranking de Alumnos por Facturación Histórica
+              </h3>
+              {studentRevenue.length === 0 ? (
+                <p className="text-xs text-slate-400 py-8 text-center italic">No hay pagos registrados aún.</p>
+              ) : (
+                <div className="space-y-3">
+                  {studentRevenue.map(([name, amount], idx) => (
+                    <div key={name} className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/40 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-5 h-5 rounded-full bg-accent/10 dark:bg-accent/20 text-accent-dark dark:text-accent-light font-bold flex items-center justify-center text-[10px]">
+                          #{idx + 1}
+                        </span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{name}</span>
+                      </div>
+                      <span className="font-extrabold text-slate-900 dark:text-white">
+                        ${amount.toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          {/* Información de Privacidad y Almacenamiento */}
+          <div className="bg-slate-100 dark:bg-slate-900/60 p-5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400 space-y-2">
+            <h4 className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-2">
+              🛡️ Privacidad y Almacenamiento Local Seguro
+            </h4>
+            <p>
+              Esta aplicación funciona íntegramente en tu equipo local, sin rastreo externo ni bases de datos en la nube. Todas las operaciones y datos se sincronizan directamente en el <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">localStorage</code> de tu navegador bajo la clave <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">roberto_dashboard_v3_clean</code>.
+            </p>
+            <p>
+              Utiliza el botón <strong>Descargar Respaldo JSON</strong> para guardar una copia de tus registros o <strong>Exportar CSV</strong> para importar pagos directamente en hojas de cálculo o programas de contabilidad.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // COMPONENTE MODAL UNIFICADO
+    // ----------------------------------------------------
+    function ModalDialog({ modal, data, onClose, onSaveTask, onSaveClass, onSaveStudent, onSaveBooking, onSavePayment }) {
+      const { type, item } = modal;
+
+      useEffect(() => {
+        const handleKeyDown = (e) => {
+          if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+      }, [onClose]);
+
+      const titles = {
+        task: item ? 'Editar Tarea' : 'Nueva Tarea',
+        class: item ? 'Editar Clase' : 'Programar Nueva Clase',
+        student: item ? 'Editar Alumno' : 'Nuevo Alumno',
+        booking: item ? 'Editar Reserva' : 'Nueva Reserva de Clase',
+        payment: item ? 'Editar Pago / Factura' : 'Registrar Pago / Factura'
+      };
+
+      return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh]">
+            
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                {titles[type] || 'Formulario'}
+              </h3>
+              <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">✕</button>
+            </div>
+
+            <div className="py-4">
+              {type === 'task' && (
+                <TaskForm item={item} onSave={onSaveTask} onCancel={onClose} />
+              )}
+              {type === 'class' && (
+                <ClassForm item={item} defaultDate={modal.defaultDate} students={data.students} onSave={onSaveClass} onCancel={onClose} />
+              )}
+              {type === 'student' && (
+                <StudentForm item={item} onSave={onSaveStudent} onCancel={onClose} />
+              )}
+              {type === 'booking' && (
+                <BookingForm item={item} students={data.students} classes={data.classes} onSave={onSaveBooking} onCancel={onClose} />
+              )}
+              {type === 'payment' && (
+                <PaymentForm item={item} students={data.students} onSave={onSavePayment} onCancel={onClose} />
+              )}
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // FORMULARIOS EN ESPAÑOL
+    // ----------------------------------------------------
+
+    function TaskForm({ item, onSave, onCancel }) {
+      const [title, setTitle] = useState(item ? item.title : '');
+      const [category, setCategory] = useState(item ? item.category : 'Preparación');
+      const [priority, setPriority] = useState(item ? item.priority : 'Media');
+      const [status, setStatus] = useState(item ? item.status : 'pendiente');
+      const [dueDate, setDueDate] = useState(item ? item.dueDate : new Date().toISOString().slice(0, 10));
+      const [time, setTime] = useState(item?.time || '');
+      const [notes, setNotes] = useState(item ? item.notes : '');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!title.trim()) return alert("Por favor, introduce el título de la tarea");
+        onSave({ id: item?.id, title, category, priority, status, dueDate, time, notes });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold block mb-1">Título de la Tarea *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="p. ej., Preparar ejercicios de gramática"
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none focus:ring-2 focus:ring-accent"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Categoría</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                {['Preparación', 'Calificaciones', 'Administración', 'Seguimiento', 'Currículo', 'Personal'].map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Prioridad</label>
+              <select
+                value={priority}
+                onChange={(e) => setPriority(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                {['Urgente', 'Alta', 'Media', 'Baja'].map(p => <option key={p} value={p}>{p}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Fecha Límite</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Hora (Opcional)</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Estado</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="pendiente">Pendiente</option>
+                <option value="en_progreso">En Progreso</option>
+                <option value="completada">Completada</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Notas y Detalles</label>
+            <textarea
+              rows="3"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Puntos clave, enlaces a materiales o recordatorios..."
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold">Cancelar</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white font-bold">Guardar Tarea</button>
+          </div>
+        </form>
+      );
+    }
+
+    function ClassForm({ item, defaultDate, students, onSave, onCancel }) {
+      const [name, setName] = useState(item ? item.name : '');
+      const [subject, setSubject] = useState(item ? item.subject : '');
+      const [dayOfWeek, setDayOfWeek] = useState(item ? item.dayOfWeek : 'Lunes');
+      const [date, setDate] = useState(item?.date || defaultDate || new Date().toISOString().slice(0, 10));
+      const [time, setTime] = useState(item ? item.time : '10:00');
+      const [durationMinutes, setDurationMinutes] = useState(item ? item.durationMinutes : 60);
+      const [location, setLocation] = useState(item ? item.location : '');
+      const [capacity, setCapacity] = useState(item ? item.capacity : 1);
+      const [description, setDescription] = useState(item ? item.description : '');
+      const [enrolledStudentIds, setEnrolledStudentIds] = useState(item ? item.enrolledStudentIds || [] : []);
+      const [autoInvoice, setAutoInvoice] = useState(!item); // Solo true por defecto si es nueva
+
+      const toggleStudent = (id) => {
+        setEnrolledStudentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name.trim()) return alert("El nombre de la clase es obligatorio");
+        onSave({
+          id: item?.id,
+          name,
+          subject: subject || 'General',
+          dayOfWeek,
+          date,
+          time,
+          durationMinutes: Number(durationMinutes),
+          location,
+          capacity: Number(capacity),
+          description,
+          enrolledStudentIds,
+          status: item?.status || 'Programada',
+          autoInvoice
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold block mb-1">Nombre de la Clase *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="p. ej., Francés Conversacional B1"
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Materia / Asignatura</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="p. ej., Idiomas"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Fecha</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => {
+                  setDate(e.target.value);
+                  const d = new Date(e.target.value);
+                  const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+                  setDayOfWeek(days[d.getUTCDay()]);
+                }}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Día de la Semana</label>
+              <select
+                value={dayOfWeek}
+                onChange={(e) => setDayOfWeek(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                {['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Hora de inicio</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Duración (min)</label>
+              <input
+                type="number"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Cupo Máximo</label>
+              <input
+                type="number"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Enlace de Videollamada (Zoom / Meet opcional)</label>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="https://zoom.us/..."
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Inscribir Alumnos</label>
+            {students.length === 0 ? (
+              <p className="text-[11px] text-slate-400 p-2 bg-slate-50 dark:bg-slate-800/40 rounded-lg italic">
+                Aún no has registrado alumnos. Podrás inscribirlos más adelante.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2 max-h-28 overflow-y-auto p-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200 dark:border-slate-700">
+                {students.map(s => {
+                  const checked = enrolledStudentIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleStudent(s.id)}
+                      className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
+                        checked
+                          ? 'bg-accent text-white'
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {checked ? '✓ ' : '+ '}{s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Descripción y Contenidos</label>
+            <textarea
+              rows="2"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Objetivos de la clase, materiales necesarios..."
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+            ></textarea>
+          </div>
+
+          {!item && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
+              <input 
+                type="checkbox" 
+                id="autoInvoiceCheck"
+                checked={autoInvoice} 
+                onChange={(e) => setAutoInvoice(e.target.checked)} 
+                className="w-4 h-4 accent-emerald-600"
+              />
+              <label htmlFor="autoInvoiceCheck" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
+                Generar facturas pendientes automáticamente para los alumnos inscritos al crear esta clase
+              </label>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold">Cancelar</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white font-bold">Guardar Clase</button>
+          </div>
+        </form>
+      );
+    }
+
+    function StudentForm({ item, onSave, onCancel }) {
+      const [name, setName] = useState(item ? item.name : '');
+      const [email, setEmail] = useState(item ? item.email : '');
+      const [phone, setPhone] = useState(item ? item.phone : '');
+      const [hourlyRate, setHourlyRate] = useState(item ? item.hourlyRate : 1500);
+      const [status, setStatus] = useState(item ? item.status : 'Activo');
+      const [balanceDue, setBalanceDue] = useState(item ? item.balanceDue : 0);
+      const [notes, setNotes] = useState(item ? item.notes : '');
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!name.trim()) return alert("El nombre del alumno es obligatorio");
+        onSave({
+          id: item?.id,
+          name,
+          email,
+          phone,
+          hourlyRate: Number(hourlyRate),
+          status,
+          balanceDue: Number(balanceDue),
+          notes
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="font-semibold block mb-1">Nombre Completo del Alumno *</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="p. ej., Carlos Mendoza"
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              required
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Correo Electrónico</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="alumno@ejemplo.com"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Teléfono de Contacto</label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+34 600 000 000"
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Tarifa por Hora ($)</label>
+              <input
+                type="number"
+                value={hourlyRate}
+                onChange={(e) => setHourlyRate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Estado</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="Activo">Activo</option>
+                <option value="Inactivo">Inactivo</option>
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Saldo Pendiente ($)</label>
+              <input
+                type="number"
+                value={balanceDue}
+                onChange={(e) => setBalanceDue(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Notas Pedagógicas y Observaciones</label>
+            <textarea
+              rows="3"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Puntos fuertes, áreas de mejora, preferencias de horario..."
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold">Cancelar</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white font-bold">Guardar Alumno</button>
+          </div>
+        </form>
+      );
+    }
+
+    function BookingForm({ item, students, classes, onSave, onCancel }) {
+      const [studentId, setStudentId] = useState(item ? item.studentId : (students[0]?.id || ''));
+      const [studentName, setStudentName] = useState(item ? item.studentName : (students[0]?.name || ''));
+      const [classId, setClassId] = useState(item ? item.classId : (classes[0]?.id || 'custom'));
+      const [className, setClassName] = useState(item ? item.className : (classes[0]?.name || 'Sesión Privada 1 a 1'));
+      const [date, setDate] = useState(item ? item.date : new Date().toISOString().slice(0, 10));
+      const [time, setTime] = useState(item ? item.time : '10:00');
+      const [duration, setDuration] = useState(item ? item.duration : 60);
+      const [rate, setRate] = useState(item ? item.rate : (students[0]?.hourlyRate || 1500));
+      const [status, setStatus] = useState(item ? item.status : 'Confirmada');
+      const [paymentStatus, setPaymentStatus] = useState(item ? item.paymentStatus : 'Pendiente');
+
+      const handleStudentSelect = (e) => {
+        const sid = e.target.value;
+        setStudentId(sid);
+        const s = students.find(x => x.id === sid);
+        if (s) {
+          setStudentName(s.name);
+          setRate(s.hourlyRate);
+        }
+      };
+
+      const handleClassChange = (e) => {
+        const cid = e.target.value;
+        setClassId(cid);
+        const sel = classes.find(c => c.id === cid);
+        if (sel) {
+          setClassName(sel.name);
+          setDuration(sel.durationMinutes);
+        } else {
+          setClassName('Sesión Privada 1 a 1');
+        }
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const finalName = studentName.trim() || (students.find(s => s.id === studentId)?.name) || 'Alumno';
+        onSave({
+          id: item?.id,
+          studentId: studentId || ('s-' + Date.now()),
+          studentName: finalName,
+          classId,
+          className,
+          date,
+          time,
+          duration: Number(duration),
+          rate: Number(rate),
+          status,
+          paymentStatus
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Alumno</label>
+              {students.length > 0 ? (
+                <select
+                  value={studentId}
+                  onChange={handleStudentSelect}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                >
+                  {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="Escribe el nombre del alumno"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  required
+                />
+              )}
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Clase o Sesión Vinculada</label>
+              <select
+                value={classId}
+                onChange={handleClassChange}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="custom">Sesión Privada 1 a 1</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Fecha</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Hora de Inicio</label>
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Duración (min)</label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(e) => setDuration(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Precio de Sesión ($)</label>
+              <input
+                type="number"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Estado de la Reserva</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="Confirmada">Confirmada</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Completada">Completada</option>
+                <option value="Reprogramada">Reprogramada</option>
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Estado del Cobro</label>
+              <select
+                value={paymentStatus}
+                onChange={(e) => setPaymentStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="Pendiente">Pendiente</option>
+                <option value="Pagado">Pagado</option>
+                <option value="Vencido">Vencido</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold">Cancelar</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white font-bold">Guardar Reserva</button>
+          </div>
+        </form>
+      );
+    }
+
+    function PaymentForm({ item, students, onSave, onCancel }) {
+      const [studentId, setStudentId] = useState(item ? item.studentId : (students[0]?.id || ''));
+      const [studentName, setStudentName] = useState(item ? item.studentName : (students[0]?.name || ''));
+      const [amount, setAmount] = useState(item ? item.amount : 75);
+      const [date, setDate] = useState(item ? item.date : new Date().toISOString().slice(0, 10));
+      const [dueDate, setDueDate] = useState(item ? item.dueDate : new Date(Date.now() + 5*86400000).toISOString().slice(0, 10));
+      const [method, setMethod] = useState(item ? item.method : 'Bizum');
+      const [status, setStatus] = useState(item ? item.status : 'Pendiente');
+      const [notes, setNotes] = useState(item ? item.notes : '');
+
+      const handleStudentSelect = (e) => {
+        const sid = e.target.value;
+        setStudentId(sid);
+        const s = students.find(x => x.id === sid);
+        if (s) setStudentName(s.name);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        const finalName = studentName.trim() || (students.find(s => s.id === studentId)?.name) || 'Alumno';
+        onSave({
+          id: item?.id,
+          invoiceNum: item?.invoiceNum,
+          studentId: studentId || ('s-' + Date.now()),
+          studentName: finalName,
+          amount: Number(amount),
+          date,
+          dueDate,
+          method,
+          status,
+          notes
+        });
+      };
+
+      return (
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Alumno *</label>
+              {students.length > 0 ? (
+                <select
+                  value={studentId}
+                  onChange={handleStudentSelect}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                >
+                  {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={studentName}
+                  onChange={(e) => setStudentName(e.target.value)}
+                  placeholder="Nombre del alumno"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                  required
+                />
+              )}
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Importe ($) *</label>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Fecha de Emisión</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Fecha Límite de Pago</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-semibold block mb-1">Método de Pago</label>
+              <select
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                {['Bizum', 'Transferencia', 'Tarjeta / Stripe', 'Efectivo', 'PayPal'].map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="font-semibold block mb-1">Estado de la Factura</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+              >
+                <option value="Pendiente">Pendiente</option>
+                <option value="Pagado">Pagado</option>
+                <option value="Vencido">Vencido</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="font-semibold block mb-1">Concepto / Notas</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="p. ej., Clases particulares del mes"
+              className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={onCancel} className="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold">Cancelar</button>
+            <button type="submit" className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-dark text-white font-bold">Guardar Factura</button>
+          </div>
+        </form>
+      );
+    }
+
+    // Renderizar la aplicación React
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
