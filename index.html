@@ -73,6 +73,36 @@
     .dark .scrollbar-thin::-webkit-scrollbar-thumb {
       background: #475569;
     }
+
+    :root {
+      --color-primary: #2B344A;
+      --color-accent: #1776CC;
+      --color-base: #F7F7F7;
+    }
+    body {
+      background-color: #F7F7F7 !important;
+      color: #1e293b;
+    }
+    .dark body, body.dark {
+      background-color: #1c2233 !important;
+      color: #f8fafc;
+    }
+    .bg-primary-custom {
+      background-color: #2B344A !important;
+    }
+    .bg-accent-custom {
+      background-color: #1776CC !important;
+    }
+    .text-primary-custom {
+      color: #2B344A !important;
+    }
+    .text-accent-custom {
+      color: #1776CC !important;
+    }
+    .banner-gradient {
+      background: linear-gradient(135deg, #2B344A 0%, #3d4f6e 60%, #1776CC 100%) !important;
+    }
+
   </style>
 </head>
 <body class="bg-base text-slate-900 dark:bg-primary-dark dark:text-slate-100 min-h-screen antialiased transition-colors duration-200">
@@ -1005,7 +1035,7 @@
       return (
         <div className="space-y-6">
           {/* Banner de Bienvenida con mini-tarjetas financieras */}
-          <div className="bg-gradient-to-r from-primary via-primary-light to-accent-dark rounded-2xl p-6 text-white shadow-xl overflow-hidden">
+          <div className="banner-gradient rounded-2xl p-6 text-white shadow-xl overflow-hidden">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                 <div>
