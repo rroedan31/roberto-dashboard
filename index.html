@@ -1027,10 +1027,31 @@
         });
       }, [data.classes, selectedDate]);
 
-      const pendingTasks = useMemo(() =>
-        data.tasks.filter(t => t.status !== 'completada').slice(0, 8),
-        [data.tasks]
-      );
+      const priorityWeight = {
+        'Urgente': 4,
+        'Alta': 3,
+        'Media': 2,
+        'Baja': 1
+      };
+
+      const pendingTasks = useMemo(() => {
+        return [...data.tasks]
+          .filter(t => t.status !== 'completada')
+          .sort((a, b) => {
+            const weightA = priorityWeight[a.priority] || 0;
+            const weightB = priorityWeight[b.priority] || 0;
+            // Ordenar de mayor a menor prioridad
+            if (weightB !== weightA) {
+              return weightB - weightA;
+            }
+            // Si tienen la misma prioridad, ordenar por fecha límite (más próxima primero)
+            if (a.dueDate && b.dueDate) {
+              return a.dueDate.localeCompare(b.dueDate);
+            }
+            return a.dueDate ? -1 : 1;
+          })
+          .slice(0, 10);
+      }, [data.tasks]);
 
       return (
         <div className="space-y-6">
