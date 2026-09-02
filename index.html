@@ -103,6 +103,19 @@
       background: linear-gradient(135deg, #2B344A 0%, #3d4f6e 60%, #1776CC 100%) !important;
     }
 
+    /* Soporte para iPhone notch y Dynamic Island */
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    .safe-top-padding {
+      padding-top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;
+    }
+    .safe-bottom-padding {
+      padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px)) !important;
+    }
+
+
   </style>
 </head>
 <body class="bg-base text-slate-900 dark:bg-primary-dark dark:text-slate-100 min-h-screen antialiased transition-colors duration-200">
@@ -762,10 +775,10 @@
             </div>
           )}
 
-          {/* CABECERA PRINCIPAL */}
-          <header className="sticky top-0 z-30 bg-white/90 dark:bg-primary/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800">
+          {/* CABECERA PRINCIPAL CON SOPORTE PARA IPHONE (DYNAMIC ISLAND / NOTCH) */}
+          <header className="sticky top-0 z-30 bg-white/95 dark:bg-primary/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 safe-top-padding transition-all">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between h-16">
+              <div className="flex items-center justify-between min-h-[4rem] py-1">
                 
                 {/* Marca & Perfil Roberto */}
                 <div className="flex items-center gap-3">
