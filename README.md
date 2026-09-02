@@ -60,3 +60,4 @@ Luego abre [http://localhost:3000](http://localhost:3000) en tu navegador.
   - **Descargar Respaldo JSON**: Exporta todos tus datos en un archivo JSON seguro.
   - **Restaurar Copia JSON**: Vuelve a cargar tus datos en cualquier navegador.
   - **Restablecer Muestra**: Restaura el conjunto de datos de prueba predeterminado.
+# roberto-dashboard
