@@ -412,12 +412,20 @@
               isRemoteUpdateRef.current = true;
               setData(records.data);
               setSyncStatus('synced');
-            } else if (error && error.code === 'PGRST116') {
-              // Registro no existe aún: lo inicializamos con los datos locales
-              await supabaseClient
+            } else if (error && (error.code === 'PGRST116' || !records)) {
+              // Si no hay datos en la nube todavía, subimos los datos locales actuales
+              const { error: upErr } = await supabaseClient
                 .from('dashboard_state')
                 .upsert({ id: 'roberto_main', data: data, updated_at: new Date().toISOString() });
-              setSyncStatus('synced');
+              if (!upErr) {
+                setSyncStatus('synced');
+              } else {
+                console.error("Supabase upsert error:", upErr);
+                setSyncStatus('offline');
+              }
+            } else if (error) {
+              console.error("Supabase error:", error);
+              setSyncStatus('offline');
             }
           } catch (err) {
             console.warn("Supabase fetch notice:", err);
@@ -444,9 +452,7 @@
               }
             )
             .subscribe((status) => {
-              if (status === 'SUBSCRIBED') {
-                setSyncStatus('synced');
-              }
+              // Realtime channel status
             });
         } catch (err) {
           console.warn("Realtime subscription error:", err);
@@ -922,6 +928,29 @@
                 {/* Utilidades / Respaldo, Limpieza y Modo Oscuro */}
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                    <button
+                      onClick={async () => {
+                        if (!supabaseClient) return alert("Supabase no configurado");
+                        showToast("Subiendo datos a la nube...", "info");
+                        try {
+                          const { error } = await supabaseClient
+                            .from('dashboard_state')
+                            .upsert({ id: 'roberto_main', data: data, updated_at: new Date().toISOString() });
+                          if (!error) {
+                            setSyncStatus('synced');
+                            showToast("¡Datos subidos a la nube con éxito!");
+                          } else {
+                            alert("Error al sincronizar con Supabase: " + (error.message || JSON.stringify(error)));
+                          }
+                        } catch(e) {
+                          alert("Error de conexión: " + e.message);
+                        }
+                      }}
+                      title="Sincronizar ahora con la Nube (Subir cambios de esta pantalla)"
+                      className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 rounded-md transition-colors"
+                    >
+                      <Icons.Refresh />
+                    </button>
                     <button
                       onClick={exportJsonBackup}
                       title="Descargar copia de seguridad JSON"
