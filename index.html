@@ -224,16 +224,11 @@
     function App() {
       const [data, setData] = useState(() => {
         try {
-          const saved = localStorage.getItem(STORAGE_KEY);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            return {
-              ...parsed,
-              payments: deduplicatePaymentsList(parsed.payments || [])
-            };
-          }
-          // Scan all previous keys to find any saved tasks, classes, payments, finanzas
+          // Lista exhaustiva de claves históricas en orden cronológico inverso
           const allHistoricalKeys = [
+            'roberto_dashboard_v14_zero_balances',
+            'roberto_dashboard_v13_clear_classes',
+            'roberto_dashboard_v12_modal_update',
             'roberto_dashboard_v11_restore_tasks',
             'roberto_dashboard_v10_data_fix',
             'roberto_dashboard_v9_finanzas_fix',
@@ -248,27 +243,44 @@
             'roberto_dashboard_v2_data',
             'roberto_dashboard_v1'
           ];
-          
-          let foundTasks = [];
-          let foundClasses = [];
-          let foundBookings = [];
-          let foundPayments = [];
-          let foundFinanzas = null;
 
-          // Check explicit keys
+          let baseData = null;
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) {
+            try {
+              baseData = JSON.parse(saved);
+            } catch (e) {}
+          }
+
+          // Si ya tenemos baseData y tiene clases, usarlo directamente
+          if (baseData && Array.isArray(baseData.classes) && baseData.classes.length > 0) {
+            return {
+              ...baseData,
+              payments: deduplicatePaymentsList(baseData.payments || [])
+            };
+          }
+
+          // Si baseData no tiene clases (o no existe), buscamos clases, tareas, etc. en el historial
+          let foundTasks = baseData?.tasks || [];
+          let foundClasses = baseData?.classes || [];
+          let foundBookings = baseData?.bookings || [];
+          let foundPayments = baseData?.payments || [];
+          let foundFinanzas = baseData?.finanzas || null;
+
+          // Escaneo de claves históricas
           for (const key of allHistoricalKeys) {
             try {
               const val = localStorage.getItem(key);
               if (val) {
                 const parsed = JSON.parse(val);
-                if ((!foundTasks || foundTasks.length === 0) && Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
-                  foundTasks = parsed.tasks;
-                }
                 if ((!foundClasses || foundClasses.length === 0) && Array.isArray(parsed.classes) && parsed.classes.length > 0) {
                   foundClasses = parsed.classes;
                 }
                 if ((!foundBookings || foundBookings.length === 0) && Array.isArray(parsed.bookings) && parsed.bookings.length > 0) {
                   foundBookings = parsed.bookings;
+                }
+                if ((!foundTasks || foundTasks.length === 0) && Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+                  foundTasks = parsed.tasks;
                 }
                 if ((!foundPayments || foundPayments.length === 0) && Array.isArray(parsed.payments) && parsed.payments.length > 0) {
                   foundPayments = parsed.payments;
@@ -282,14 +294,20 @@
             }
           }
 
-          // Fallback scan: check any other keys in localStorage starting with roberto_dashboard
+          // Fallback scan: cualquier otra clave en localStorage
           try {
             for (let i = 0; i < localStorage.length; i++) {
               const k = localStorage.key(i);
-              if (k && k.startsWith('roberto_dashboard') && !allHistoricalKeys.includes(k) && k !== STORAGE_KEY) {
+              if (k && k.startsWith('roberto_dashboard')) {
                 const v = localStorage.getItem(k);
                 if (v) {
                   const p = JSON.parse(v);
+                  if ((!foundClasses || foundClasses.length === 0) && Array.isArray(p.classes) && p.classes.length > 0) {
+                    foundClasses = p.classes;
+                  }
+                  if ((!foundBookings || foundBookings.length === 0) && Array.isArray(p.bookings) && p.bookings.length > 0) {
+                    foundBookings = p.bookings;
+                  }
                   if ((!foundTasks || foundTasks.length === 0) && Array.isArray(p.tasks) && p.tasks.length > 0) {
                     foundTasks = p.tasks;
                   }
@@ -304,24 +322,22 @@
             }
           } catch (e) {}
 
-          // Asegurar que todos los alumnos comiencen con saldo pendiente en $0 y sin notas viejas de clases
-          const cleanStudents = (INITIAL_DATA.students || []).map(s => ({
-            ...s,
-            balanceDue: 0,
-            notes: (s.notes && s.notes.includes('Pendiente de pago')) ? '' : s.notes
-          }));
-
-          return {
-            ...INITIAL_DATA,
-            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : INITIAL_DATA.tasks,
-            classes: [],
-            bookings: [],
-            payments: [],
-            students: cleanStudents,
-            finanzas: foundFinanzas || INITIAL_DATA.finanzas
+          const result = {
+            ...(baseData || INITIAL_DATA),
+            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : (baseData?.tasks || INITIAL_DATA.tasks),
+            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : (baseData?.classes || INITIAL_DATA.classes || []),
+            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : (baseData?.bookings || INITIAL_DATA.bookings || []),
+            payments: (foundPayments && foundPayments.length > 0) ? deduplicatePaymentsList(foundPayments) : (baseData?.payments || INITIAL_DATA.payments || []),
+            students: (baseData?.students && baseData.students.length > 0) ? baseData.students : INITIAL_DATA.students,
+            finanzas: foundFinanzas || baseData?.finanzas || INITIAL_DATA.finanzas
           };
+
+          return result;
         } catch (e) {
           console.error("Error al leer el estado guardado", e);
+        }
+        return INITIAL_DATA;
+      });
         }
         return INITIAL_DATA;
       });
@@ -350,7 +366,21 @@
           if (records && records.data) {
             isRemoteUpdateRef.current = true;
             isInitialCloudLoadComplete.current = true;
-            setData(records.data);
+            setData(prev => {
+              const cloudData = records.data;
+              const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
+                ? cloudData.classes
+                : (prev.classes || []);
+              const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
+                ? cloudData.bookings
+                : (prev.bookings || []);
+              return {
+                ...prev,
+                ...cloudData,
+                classes: mergedClasses,
+                bookings: mergedBookings
+              };
+            });
             setSyncStatus('synced');
             showToast("¡Datos actualizados desde la nube!");
           } else if (error) {
@@ -381,7 +411,22 @@
             if (records && records.data) {
               isRemoteUpdateRef.current = true;
               isInitialCloudLoadComplete.current = true;
-              setData(records.data);
+              setData(prev => {
+                const cloudData = records.data;
+                // Si la nube no tiene clases pero el navegador local sí tenía clases guardadas, proteger las clases locales
+                const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
+                  ? cloudData.classes
+                  : (prev.classes || []);
+                const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
+                  ? cloudData.bookings
+                  : (prev.bookings || []);
+                return {
+                  ...prev,
+                  ...cloudData,
+                  classes: mergedClasses,
+                  bookings: mergedBookings
+                };
+              });
               setSyncStatus('synced');
             } else if (error && error.code === 'PGRST116') {
               // Si no existe el registro en la base de datos, recién ahora permitimos crear el inicial
@@ -418,7 +463,21 @@
               (payload) => {
                 if (payload.new && payload.new.data) {
                   isRemoteUpdateRef.current = true;
-                  setData(payload.new.data);
+                  setData(prev => {
+                    const newData = payload.new.data;
+                    const mergedClasses = (Array.isArray(newData.classes) && newData.classes.length > 0)
+                      ? newData.classes
+                      : (prev.classes || []);
+                    const mergedBookings = (Array.isArray(newData.bookings) && newData.bookings.length > 0)
+                      ? newData.bookings
+                      : (prev.bookings || []);
+                    return {
+                      ...prev,
+                      ...newData,
+                      classes: mergedClasses,
+                      bookings: mergedBookings
+                    };
+                  });
                   setSyncStatus('synced');
                   showToast("¡Actualizado en tiempo real!", "info");
                 }
@@ -588,7 +647,7 @@
         showToast("Clase guardada correctamente");
       };
 
-            const clearAllClasses = () => {
+      const clearAllClasses = () => {
         if (confirm("¿Estás seguro de que deseas limpiar todas las clases agendadas y poner en cero todos los saldos pendientes de los alumnos?")) {
           setData(prev => ({
             ...prev,
@@ -598,6 +657,76 @@
             students: prev.students.map(s => ({ ...s, balanceDue: 0, notes: (s.notes && s.notes.includes('Pendiente de pago')) ? '' : s.notes }))
           }));
           showToast("¡Clases y saldos pendientes limpiados a $0 con éxito!");
+        }
+      };
+
+      const restoreClassesFromHistory = () => {
+        const allHistoricalKeys = [
+          'roberto_dashboard_v14_zero_balances',
+          'roberto_dashboard_v13_clear_classes',
+          'roberto_dashboard_v12_modal_update',
+          'roberto_dashboard_v11_restore_tasks',
+          'roberto_dashboard_v10_data_fix',
+          'roberto_dashboard_v9_finanzas_fix',
+          'roberto_dashboard_v8_finanzas',
+          'roberto_dashboard_v7_friday_and_pending',
+          'roberto_dashboard_v6_schedule',
+          'roberto_dashboard_v6',
+          'roberto_dashboard_v5_rates',
+          'roberto_dashboard_v4_students',
+          'roberto_dashboard_v3_clean',
+          'roberto_dashboard_v2_es',
+          'roberto_dashboard_v2_data',
+          'roberto_dashboard_v1'
+        ];
+
+        let found = [];
+        let foundBookings = [];
+
+        // Revisar claves históricas
+        for (const k of allHistoricalKeys) {
+          try {
+            const val = localStorage.getItem(k);
+            if (val) {
+              const p = JSON.parse(val);
+              if (Array.isArray(p.classes) && p.classes.length > 0 && found.length === 0) {
+                found = p.classes;
+              }
+              if (Array.isArray(p.bookings) && p.bookings.length > 0 && foundBookings.length === 0) {
+                foundBookings = p.bookings;
+              }
+            }
+          } catch(e) {}
+        }
+
+        // Revisar cualquier otra clave en localStorage
+        try {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('roberto_dashboard')) {
+              const val = localStorage.getItem(k);
+              if (val) {
+                const p = JSON.parse(val);
+                if (Array.isArray(p.classes) && p.classes.length > 0 && found.length === 0) {
+                  found = p.classes;
+                }
+                if (Array.isArray(p.bookings) && p.bookings.length > 0 && foundBookings.length === 0) {
+                  foundBookings = p.bookings;
+                }
+              }
+            }
+          }
+        } catch(e) {}
+
+        if (found.length > 0) {
+          setData(prev => ({
+            ...prev,
+            classes: found,
+            bookings: (foundBookings.length > 0) ? foundBookings : prev.bookings
+          }));
+          showToast(`¡Se restauraron ${found.length} clases encontradas en el historial local!`);
+        } else {
+          showToast("No se encontraron clases anteriores en la memoria de este navegador.", "error");
         }
       };
 
@@ -1087,6 +1216,7 @@
               {currentTab === 'classes' && (
                 <ClassesView
                   onClearAllClasses={clearAllClasses}
+                  onRestoreClasses={restoreClassesFromHistory}
                   classes={data.classes || []}
                   students={data.students || []}
                   searchQuery={searchQuery}
@@ -2007,7 +2137,7 @@
     // ----------------------------------------------------
     // PESTAÑA 3: CLASES Y HORARIOS
     // ----------------------------------------------------
-    function ClassesView({ classes, students, searchQuery, onOpenModal, onDeleteClass, onClearAllClasses }) {
+    function ClassesView({ classes, students, searchQuery, onOpenModal, onDeleteClass, onClearAllClasses, onRestoreClasses }) {
       const studentMap = useMemo(() => {
         return new Map(students.map(s => [s.id, s.name]));
       }, [students]);
@@ -2033,6 +2163,13 @@
             </div>
             <div className="flex items-center gap-2">
               <button
+                onClick={onRestoreClasses}
+                className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 text-amber-700 dark:text-amber-300 text-xs font-bold border border-amber-200/50 dark:border-amber-900 transition shadow-sm"
+                title="Recuperar clases guardadas en versiones o sesiones anteriores del navegador"
+              >
+                <Icons.Refresh /> Recuperar Clases Anteriores
+              </button>
+              <button
                 onClick={onClearAllClasses}
                 className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs font-bold border border-rose-200/50 dark:border-rose-900 transition shadow-sm"
                 title="Eliminar todas las clases agendadas y poner saldos pendientes en cero"
@@ -2053,12 +2190,20 @@
               <Icons.EmptyBox />
               <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">No hay clases programadas</h3>
               <p className="text-xs text-slate-500 mt-1 mb-4">Configura tus asignaturas, días y horarios de clase habituales.</p>
-              <button
-                onClick={() => onOpenModal({ type: 'class' })}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
-              >
-                <Icons.Plus /> Añadir mi primera clase
-              </button>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => onOpenModal({ type: 'class' })}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold transition shadow-sm"
+                >
+                  <Icons.Plus /> Añadir mi primera clase
+                </button>
+                <button
+                  onClick={onRestoreClasses}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold transition shadow-sm border border-amber-300/60"
+                >
+                  <Icons.Refresh /> Restaurar Clases Anteriores
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
