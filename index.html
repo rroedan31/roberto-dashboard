@@ -2380,10 +2380,10 @@
         return new Map(safeStudents.map(s => [s.id, s.name]));
       }, [safeStudents]);
 
-      // Horas del timeline (desde las 7:00 AM hasta las 11:00 PM)
+      // Horas del timeline (desde las 5:00 AM hasta las 8:00 PM)
       const hours = useMemo(() => {
         const list = [];
-        for (let h = 7; h <= 23; h++) {
+        for (let h = 5; h <= 20; h++) {
           const hour12 = h % 12 === 0 ? 12 : h % 12;
           const ampm = h < 12 ? 'AM' : 'PM';
           list.push({
@@ -2529,9 +2529,9 @@
         return `${formatM(startMin)} - ${formatM(endMin)}`;
       };
 
-      const timelineStartMin = 7 * 60; // 7:00 AM
-      const timelineEndMin = 24 * 60;  // 12:00 AM (midnight)
-      const totalTimelineMin = timelineEndMin - timelineStartMin; // 17 hours = 1020 mins
+      const timelineStartMin = 5 * 60; // 5:00 AM
+      const timelineEndMin = 21 * 60;  // 9:00 PM (end of 8:00 PM hour)
+      const totalTimelineMin = timelineEndMin - timelineStartMin;
       const hourColWidth = 180; // px por hora para mayor espacio de lectura
 
       return (
@@ -2613,7 +2613,7 @@
                 </span>
               </div>
               <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                7:00 AM — 11:00 PM
+                5:00 AM — 8:00 PM
               </span>
             </div>
 
