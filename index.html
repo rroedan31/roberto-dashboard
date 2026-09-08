@@ -152,64 +152,7 @@
         hourlyRate: 1500
       },
       tasks: [],
-      classes: [
-        {
-          id: 'c-1',
-          name: 'Clase con Miguel Rojas',
-          subject: 'Tutoría',
-          dayOfWeek: 'Miércoles',
-          time: '18:00 - 19:00',
-          date: '2026-09-02',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-1'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora'
-        },
-        {
-          id: 'c-2',
-          name: 'Clase con Merari Vasquez',
-          subject: 'Tutoría',
-          dayOfWeek: 'Miércoles',
-          time: '19:00 - 20:00',
-          date: '2026-09-02',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-2'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora'
-        },
-        {
-          id: 'c-3',
-          name: 'Clase con Julio Polanco (Gratis)',
-          subject: 'Tutoría',
-          dayOfWeek: 'Jueves',
-          time: '05:30 - 06:30',
-          date: '2026-09-03',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-6'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora de cortesía (gratis)'
-        },
-        {
-          id: 'c-4',
-          name: 'Clase con Oriolis y Miguel',
-          subject: 'Tutoría',
-          dayOfWeek: 'Viernes',
-          time: '17:00 - 18:00',
-          date: '2026-09-04',
-          durationMinutes: 60,
-          location: '',
-          capacity: 2,
-          enrolledStudentIds: ['s-4', 's-1'],
-          status: 'Programada',
-          description: 'Sesión compartida de 1 hora a las 5:00 PM'
-        }
-      ],
+      classes: [],
       students: [
         { id: 's-1', name: 'Miguel Rojas', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-2', name: 'Merari Vasquez', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 },
@@ -222,13 +165,7 @@
         { id: 's-9', name: 'Gisselle Franco', email: '', phone: '', hourlyRate: 2500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-10', name: 'Jonathan Rincon', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 }
       ],
-      bookings: [
-        { id: 'b-1', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-1', className: 'Clase con Miguel Rojas', date: '2026-09-02', time: '18:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-2', studentId: 's-2', studentName: 'Merari Vasquez', classId: 'c-2', className: 'Clase con Merari Vasquez', date: '2026-09-02', time: '19:00', duration: 60, rate: 2000, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-3', studentId: 's-6', studentName: 'Julio Polanco', classId: 'c-3', className: 'Clase con Julio Polanco (Gratis)', date: '2026-09-03', time: '05:30', duration: 60, rate: 0, status: 'Confirmada', paymentStatus: 'Cortesía' },
-        { id: 'b-4', studentId: 's-4', studentName: 'Oriolis Olivero', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-5', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' }
-      ],
+      bookings: [],
       payments: [],
       finanzas: {
         capitalActual: 0,
@@ -482,26 +419,34 @@
             } catch (e) {}
           }
 
-          // Combinar las clases de baseData con TODAS las clases encontradas en cualquier clave previa
-          const allCandidateClasses = mergeClassesLists(
-            (baseData && Array.isArray(baseData.classes)) ? baseData.classes : [],
-            scan.mergedClasses,
-            INITIAL_DATA.classes
-          );
+          // Si el usuario ya tiene un estado en baseData, respetar estrictamente sus clases y reservas
+          // (incluso si están vacías porque las limpió). Solo buscar en versiones viejas si no existe baseData.
+          let initialClasses = [];
+          let initialBookings = [];
 
-          const allCandidateBookings = mergeBookingsLists(
-            (baseData && Array.isArray(baseData.bookings)) ? baseData.bookings : [],
-            scan.mergedBookings,
-            INITIAL_DATA.bookings
-          );
+          if (baseData && Array.isArray(baseData.classes)) {
+            initialClasses = baseData.classes;
+          } else if (scan.mergedClasses && scan.mergedClasses.length > 0) {
+            initialClasses = scan.mergedClasses;
+          } else {
+            initialClasses = INITIAL_DATA.classes || [];
+          }
+
+          if (baseData && Array.isArray(baseData.bookings)) {
+            initialBookings = baseData.bookings;
+          } else if (scan.mergedBookings && scan.mergedBookings.length > 0) {
+            initialBookings = scan.mergedBookings;
+          } else {
+            initialBookings = INITIAL_DATA.bookings || [];
+          }
 
           const result = {
             ...(baseData || INITIAL_DATA),
             tasks: (baseData && Array.isArray(baseData.tasks) && baseData.tasks.length > 0) 
               ? baseData.tasks 
               : ((scan.foundTasks && scan.foundTasks.length > 0) ? scan.foundTasks : INITIAL_DATA.tasks),
-            classes: allCandidateClasses.length > 0 ? allCandidateClasses : INITIAL_DATA.classes,
-            bookings: allCandidateBookings.length > 0 ? allCandidateBookings : INITIAL_DATA.bookings,
+            classes: initialClasses,
+            bookings: initialBookings,
             payments: deduplicatePaymentsList((baseData && baseData.payments) || scan.foundPayments || INITIAL_DATA.payments || []),
             students: (baseData && Array.isArray(baseData.students) && baseData.students.length > 0)
               ? baseData.students
@@ -542,13 +487,11 @@
             isInitialCloudLoadComplete.current = true;
             setData(prev => {
               const cloudData = records.data;
-              const mergedClasses = mergeClassesLists(prev.classes || [], cloudData.classes || []);
-              const mergedBookings = mergeBookingsLists(prev.bookings || [], cloudData.bookings || []);
               return {
                 ...prev,
                 ...cloudData,
-                classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
-                bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
+                classes: Array.isArray(cloudData.classes) ? cloudData.classes : [],
+                bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : []
               };
             });
             setSyncStatus('synced');
@@ -583,13 +526,11 @@
               isInitialCloudLoadComplete.current = true;
               setData(prev => {
                 const cloudData = records.data;
-                const mergedClasses = mergeClassesLists(prev.classes || [], cloudData.classes || []);
-                const mergedBookings = mergeBookingsLists(prev.bookings || [], cloudData.bookings || []);
                 return {
                   ...prev,
                   ...cloudData,
-                  classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
-                  bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
+                  classes: Array.isArray(cloudData.classes) ? cloudData.classes : (prev.classes || []),
+                  bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : (prev.bookings || [])
                 };
               });
               setSyncStatus('synced');
@@ -630,13 +571,11 @@
                   isRemoteUpdateRef.current = true;
                   setData(prev => {
                     const newData = payload.new.data;
-                    const mergedClasses = mergeClassesLists(prev.classes || [], newData.classes || []);
-                    const mergedBookings = mergeBookingsLists(prev.bookings || [], newData.bookings || []);
                     return {
                       ...prev,
                       ...newData,
-                      classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
-                      bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
+                      classes: Array.isArray(newData.classes) ? newData.classes : (prev.classes || []),
+                      bookings: Array.isArray(newData.bookings) ? newData.bookings : (prev.bookings || [])
                     };
                   });
                   setSyncStatus('synced');
@@ -808,16 +747,64 @@
         showToast("Clase guardada correctamente");
       };
 
-      const clearAllClasses = () => {
+      const clearAllClasses = async () => {
         if (confirm("¿Estás seguro de que deseas limpiar todas las clases agendadas y poner en cero todos los saldos pendientes de los alumnos?")) {
-          setData(prev => ({
-            ...prev,
+          // 1. Limpiar todas las claves históricas de localStorage para evitar resurrecciones
+          try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && (k.startsWith('roberto_dashboard') || k.includes('roberto_dashboard'))) {
+                keysToRemove.push(k);
+              }
+            }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+          } catch (e) {
+            console.warn("Error limpiando claves viejas de localStorage", e);
+          }
+
+          // 2. Construir el nuevo estado limpio
+          const updatedPayments = (data.payments || []).filter(p => p.status === 'Pagado');
+          const updatedStudents = (data.students || []).map(s => ({
+            ...s,
+            balanceDue: 0,
+            notes: (s.notes && s.notes.includes('Pendiente de pago')) ? '' : s.notes
+          }));
+
+          const clearedData = {
+            ...data,
             classes: [],
             bookings: [],
-            payments: prev.payments.filter(p => p.status === 'Pagado'),
-            students: prev.students.map(s => ({ ...s, balanceDue: 0, notes: (s.notes && s.notes.includes('Pendiente de pago')) ? '' : s.notes }))
-          }));
-          showToast("¡Clases y saldos pendientes limpiados a $0 con éxito!");
+            payments: updatedPayments,
+            students: updatedStudents
+          };
+
+          // 3. Guardar inmediatamente en localStorage bajo STORAGE_KEY
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(clearedData));
+          } catch (e) {}
+
+          // 4. Actualizar estado de React
+          setData(clearedData);
+
+          // 5. Enviar inmediatamente a Supabase para sincronizar a todos los dispositivos
+          if (supabaseClient) {
+            try {
+              setSyncStatus('syncing');
+              await supabaseClient
+                .from('dashboard_state')
+                .upsert({
+                  id: 'roberto_main',
+                  data: clearedData,
+                  updated_at: new Date().toISOString()
+                });
+              setSyncStatus('synced');
+            } catch (err) {
+              console.warn("Error sincronizando reseteo a Supabase", err);
+            }
+          }
+
+          showToast("¡Clases y saldos pendientes limpiados a $0 permanentemente!");
         }
       };
 
@@ -835,8 +822,8 @@
           const mergedBookings = mergeBookingsLists(prev.bookings || [], selectedBookings || []);
           return {
             ...prev,
-            classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
-            bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
+            classes: mergedClasses,
+            bookings: mergedBookings
           };
         });
         setModal(null);
