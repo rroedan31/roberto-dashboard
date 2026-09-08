@@ -2863,35 +2863,40 @@
       );
     }
 
-    function ClassForm({ item, defaultDate, students = [], onSave, onCancel }) {
-      const studentList = Array.isArray(students) ? students : [];
-      const [selectedStudentId, setSelectedStudentId] = useState(() => {
-        if (item && item.enrolledStudentIds && item.enrolledStudentIds.length > 0) {
-          return item.enrolledStudentIds[0];
+        function ClassForm({ item, defaultDate, students, onSave, onCancel }) {
+      const studentList = (students && Array.isArray(students)) ? students : [];
+      const initialStudentId = (item && item.enrolledStudentIds && item.enrolledStudentIds[0])
+        ? item.enrolledStudentIds[0]
+        : (studentList.length > 0 ? studentList[0].id : '');
+
+      const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId);
+      const [subject, setSubject] = useState(item ? (item.subject || 'Tutoría') : 'Tutoría');
+      const [dayOfWeek, setDayOfWeek] = useState(item ? (item.dayOfWeek || 'Lunes') : 'Lunes');
+      const [date, setDate] = useState((item && item.date) ? item.date : (defaultDate || new Date().toISOString().slice(0, 10)));
+      const [time, setTime] = useState((item && item.time) ? item.time : '18:00');
+      const [durationMinutes, setDurationMinutes] = useState((item && item.durationMinutes) ? item.durationMinutes : 60);
+      const [location, setLocation] = useState((item && item.location) ? item.location : '');
+      const [description, setDescription] = useState((item && item.description) ? item.description : '');
+      const [autoInvoice, setAutoInvoice] = useState(!item);
+
+      // Encontrar alumno actual
+      let studentName = '';
+      for (let i = 0; i < studentList.length; i++) {
+        if (studentList[i].id === selectedStudentId) {
+          studentName = studentList[i].name;
+          break;
         }
-        return (studentList.length > 0 && studentList[0]) ? studentList[0].id : '';
-      });
+      }
+      if (!studentName && studentList.length > 0) {
+        studentName = studentList[0].name;
+      }
 
-      const [subject, setSubject] = useState(() => item?.subject || 'Tutoría');
-      const [dayOfWeek, setDayOfWeek] = useState(() => item?.dayOfWeek || 'Lunes');
-      const [date, setDate] = useState(() => item?.date || defaultDate || new Date().toISOString().slice(0, 10));
-      const [time, setTime] = useState(() => item?.time || '18:00');
-      const [durationMinutes, setDurationMinutes] = useState(() => item?.durationMinutes || 60);
-      const [location, setLocation] = useState(() => item?.location || '');
-      const [description, setDescription] = useState(() => item?.description || '');
-      const [autoInvoice, setAutoInvoice] = useState(() => !item);
+      const generatedClassName = studentName ? ('Clase con ' + studentName) : 'Clase individual';
 
-      // Calcular nombre automático: "Clase con [Nombre del Estudiante]"
-      const currentStudent = studentList.find(s => s && s.id === selectedStudentId);
-      const generatedClassName = currentStudent ? ('Clase con ' + currentStudent.name) : (item?.name || 'Clase individual');
-
-      const handleSubmit = (e) => {
+      const handleFormSubmit = (e) => {
         e.preventDefault();
-        if (!selectedStudentId && studentList.length > 0) {
-          return alert("Por favor selecciona un estudiante para la clase.");
-        }
         onSave({
-          id: item?.id,
+          id: item ? item.id : undefined,
           name: generatedClassName,
           subject: subject || 'Tutoría',
           dayOfWeek: dayOfWeek || 'Lunes',
@@ -2902,35 +2907,34 @@
           capacity: 1,
           description: description || ('Sesión de ' + (durationMinutes || 60) + ' min'),
           enrolledStudentIds: selectedStudentId ? [selectedStudentId] : [],
-          status: item?.status || 'Programada',
+          status: (item && item.status) ? item.status : 'Programada',
           autoInvoice: Boolean(autoInvoice)
         });
       };
 
       return (
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+        <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
           <div>
             <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-200">Estudiante de la Clase *</label>
             {studentList.length === 0 ? (
               <p className="text-xs text-rose-500 p-2 bg-rose-50 dark:bg-rose-950/40 rounded-lg">
-                No tienes alumnos registrados aún. Regístralos en "Estudiantes y Reservas" primero.
+                No tienes alumnos registrados aún. Regístralos en la pestaña "Estudiantes y Reservas".
               </p>
             ) : (
               <select
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
                 className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-accent text-sm"
-                required
               >
                 {studentList.map(s => (
                   <option key={s.id} value={s.id}>
-                    {s.name} {s.hourlyRate ? `($${s.hourlyRate}/h)` : ''}
+                    {s.name} {s.hourlyRate ? ('($' + s.hourlyRate + '/h)') : ''}
                   </option>
                 ))}
               </select>
             )}
             <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <span>Nombre generado automáticamente:</span>
+              <span>Nombre de la clase:</span>
               <span className="font-bold text-accent dark:text-accent-light">{generatedClassName}</span>
             </div>
           </div>
@@ -2972,7 +2976,7 @@
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="font-semibold block mb-1">Hora de inicio</label>
               <input
@@ -2991,15 +2995,6 @@
                 className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
               />
             </div>
-            <div>
-              <label className="font-semibold block mb-1">Cupo Máximo</label>
-              <input
-                type="number"
-                value={capacity}
-                onChange={(e) => setCapacity(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
-              />
-            </div>
           </div>
 
           <div>
@@ -3012,8 +3007,6 @@
               className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none"
             />
           </div>
-
-
 
           <div>
             <label className="font-semibold block mb-1">Descripción y Contenidos</label>
@@ -3036,7 +3029,7 @@
                 className="w-4 h-4 accent-emerald-600"
               />
               <label htmlFor="autoInvoiceCheck" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
-                Generar facturas pendientes automáticamente para los alumnos inscritos al crear esta clase
+                Generar factura pendiente automáticamente para este alumno
               </label>
             </div>
           )}
