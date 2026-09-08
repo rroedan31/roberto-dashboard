@@ -142,7 +142,7 @@
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
 
-    const STORAGE_KEY = 'roberto_dashboard_v14_zero_balances';
+    const STORAGE_KEY = 'roberto_dashboard_v15_restore_classes';
 
     const INITIAL_DATA = {
       user: {
@@ -152,7 +152,64 @@
         hourlyRate: 1500
       },
       tasks: [],
-      classes: [],
+      classes: [
+        {
+          id: 'c-1',
+          name: 'Clase con Miguel Rojas',
+          subject: 'Tutoría',
+          dayOfWeek: 'Miércoles',
+          time: '18:00 - 19:00',
+          date: '2026-09-02',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-1'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora'
+        },
+        {
+          id: 'c-2',
+          name: 'Clase con Merari Vasquez',
+          subject: 'Tutoría',
+          dayOfWeek: 'Miércoles',
+          time: '19:00 - 20:00',
+          date: '2026-09-02',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-2'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora'
+        },
+        {
+          id: 'c-3',
+          name: 'Clase con Julio Polanco (Gratis)',
+          subject: 'Tutoría',
+          dayOfWeek: 'Jueves',
+          time: '05:30 - 06:30',
+          date: '2026-09-03',
+          durationMinutes: 60,
+          location: '',
+          capacity: 1,
+          enrolledStudentIds: ['s-6'],
+          status: 'Programada',
+          description: 'Sesión individual de 1 hora de cortesía (gratis)'
+        },
+        {
+          id: 'c-4',
+          name: 'Clase con Oriolis y Miguel',
+          subject: 'Tutoría',
+          dayOfWeek: 'Viernes',
+          time: '17:00 - 18:00',
+          date: '2026-09-04',
+          durationMinutes: 60,
+          location: '',
+          capacity: 2,
+          enrolledStudentIds: ['s-4', 's-1'],
+          status: 'Programada',
+          description: 'Sesión compartida de 1 hora a las 5:00 PM'
+        }
+      ],
       students: [
         { id: 's-1', name: 'Miguel Rojas', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-2', name: 'Merari Vasquez', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 },
@@ -165,7 +222,13 @@
         { id: 's-9', name: 'Gisselle Franco', email: '', phone: '', hourlyRate: 2500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-10', name: 'Jonathan Rincon', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 }
       ],
-      bookings: [],
+      bookings: [
+        { id: 'b-1', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-1', className: 'Clase con Miguel Rojas', date: '2026-09-02', time: '18:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-2', studentId: 's-2', studentName: 'Merari Vasquez', classId: 'c-2', className: 'Clase con Merari Vasquez', date: '2026-09-02', time: '19:00', duration: 60, rate: 2000, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-3', studentId: 's-6', studentName: 'Julio Polanco', classId: 'c-3', className: 'Clase con Julio Polanco (Gratis)', date: '2026-09-03', time: '05:30', duration: 60, rate: 0, status: 'Confirmada', paymentStatus: 'Cortesía' },
+        { id: 'b-4', studentId: 's-4', studentName: 'Oriolis Olivero', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
+        { id: 'b-5', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' }
+      ],
       payments: [],
       finanzas: {
         capitalActual: 0,
@@ -383,11 +446,19 @@
             }
           } catch (e) {}
 
+          const resultClasses = (foundClasses && foundClasses.length > 0)
+            ? foundClasses
+            : ((baseData && Array.isArray(baseData.classes) && baseData.classes.length > 0) ? baseData.classes : INITIAL_DATA.classes);
+
+          const resultBookings = (foundBookings && foundBookings.length > 0)
+            ? foundBookings
+            : ((baseData && Array.isArray(baseData.bookings) && baseData.bookings.length > 0) ? baseData.bookings : INITIAL_DATA.bookings);
+
           const result = {
             ...(baseData || INITIAL_DATA),
             tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : ((baseData && baseData.tasks) || INITIAL_DATA.tasks),
-            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : ((baseData && baseData.classes) || INITIAL_DATA.classes || []),
-            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : ((baseData && baseData.bookings) || INITIAL_DATA.bookings || []),
+            classes: resultClasses,
+            bookings: resultBookings,
             payments: (foundPayments && foundPayments.length > 0) ? deduplicatePaymentsList(foundPayments) : ((baseData && baseData.payments) || INITIAL_DATA.payments || []),
             students: (baseData && baseData.students && baseData.students.length > 0) ? baseData.students : INITIAL_DATA.students,
             finanzas: foundFinanzas || (baseData && baseData.finanzas) || INITIAL_DATA.finanzas
@@ -428,10 +499,10 @@
               const cloudData = records.data;
               const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
                 ? cloudData.classes
-                : (prev.classes || []);
+                : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
               const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
                 ? cloudData.bookings
-                : (prev.bookings || []);
+                : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
               return {
                 ...prev,
                 ...cloudData,
@@ -471,13 +542,13 @@
               isInitialCloudLoadComplete.current = true;
               setData(prev => {
                 const cloudData = records.data;
-                // Si la nube no tiene clases pero el navegador local sí tenía clases guardadas, proteger las clases locales
+                // Si la nube no tiene clases pero el navegador local sí tenía clases guardadas (o DEFAULT), proteger
                 const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
                   ? cloudData.classes
-                  : (prev.classes || []);
+                  : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
                 const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
                   ? cloudData.bookings
-                  : (prev.bookings || []);
+                  : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
                 return {
                   ...prev,
                   ...cloudData,
@@ -525,10 +596,10 @@
                     const newData = payload.new.data;
                     const mergedClasses = (Array.isArray(newData.classes) && newData.classes.length > 0)
                       ? newData.classes
-                      : (prev.classes || []);
+                      : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
                     const mergedBookings = (Array.isArray(newData.bookings) && newData.bookings.length > 0)
                       ? newData.bookings
-                      : (prev.bookings || []);
+                      : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
                     return {
                       ...prev,
                       ...newData,
