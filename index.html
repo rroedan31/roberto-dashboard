@@ -537,12 +537,12 @@
             });
           }
 
-          // Si se editó la clase y ahora es no facturable (cortesía/gratis/reposición), remover cualquier factura pendiente previa generada para esta clase
+          // Si la clase es no facturable (cortesía/gratis/reposición), eliminar CUALQUIER factura (incluso si estaba como Pagada o Pendiente) para que no sume a cobros ni a saldo pendiente
           let currentPayments = prev.payments;
-          if (exists && isNonBillable) {
+          if (isNonBillable) {
             currentPayments = currentPayments.filter(p => {
               const matchesNote = p.notes && (p.notes.includes(classData.name) || p.notes.includes(cls.id));
-              return !(matchesNote && p.status === 'Pendiente');
+              return !matchesNote;
             });
           }
 
@@ -610,10 +610,12 @@
         setData(prev => {
           const student = prev.students.find(s => s.id === booking.studentId);
           const studentName = student ? student.name : booking.studentName || 'Alumno';
+          const isNonBillableBooking = ['Cortesía', 'Gratis', 'Reposición'].includes(booking.paymentStatus);
+          const finalRate = isNonBillableBooking ? 0 : Number(booking.rate !== undefined ? booking.rate : (student ? student.hourlyRate : 1500));
           const newBooking = {
             ...booking,
             studentName,
-            rate: Number(booking.rate || (student ? student.hourlyRate : 75)),
+            rate: finalRate,
             id: booking.id || 'b-' + Date.now()
           };
           const exists = prev.bookings.some(b => b.id === booking.id);
@@ -2729,13 +2731,17 @@
                           {/* Pie de la tarjeta: Estado y Botones rápidos */}
                           <div className="mt-2 pt-1.5 border-t border-sky-200/50 dark:border-sky-800/60 flex flex-wrap items-center justify-between gap-1 text-[10px]">
                             <div className="flex items-center gap-1">
-                              {evt.paidStatus === 'Pagado' ? (
-                                <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                  Pagado
-                                </span>
-                              ) : evt.billingType && evt.billingType !== 'Regular' ? (
+                              {evt.billingType && evt.billingType !== 'Regular' ? (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
                                   {evt.billingType} ($0)
+                                </span>
+                              ) : evt.paidStatus === 'Cortesía' || evt.paidStatus === 'Gratis' || evt.paidStatus === 'Reposición' ? (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                  {evt.paidStatus} ($0)
+                                </span>
+                              ) : evt.paidStatus === 'Pagado' ? (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                  Pagado
                                 </span>
                               ) : (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
