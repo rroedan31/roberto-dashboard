@@ -142,7 +142,7 @@
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
 
-    const STORAGE_KEY = 'roberto_dashboard_v15_restore_classes';
+    const STORAGE_KEY = 'roberto_dashboard_v16_merge_all_classes';
 
     const INITIAL_DATA = {
       user: {
@@ -345,29 +345,135 @@
       return clean;
     }
 
+    // Funciones auxiliares para deduplicar y fusionar clases y reservas
+    function mergeClassesLists(...lists) {
+      const map = new Map();
+      for (const list of lists) {
+        if (Array.isArray(list)) {
+          for (const c of list) {
+            if (!c) continue;
+            // Clave única basada en ID o en Nombre + Fecha + Hora
+            const compositeKey = (c.id && !c.id.startsWith('c-')) 
+              ? c.id 
+              : `${(c.name || '').trim().toLowerCase()}|${c.date || ''}|${c.time || ''}`;
+            if (!map.has(compositeKey)) {
+              map.set(compositeKey, c);
+            } else {
+              // Si ya existe, conservar el objeto que tenga más propiedades/detalles
+              const existing = map.get(compositeKey);
+              map.set(compositeKey, { ...existing, ...c });
+            }
+          }
+        }
+      }
+      return Array.from(map.values());
+    }
+
+    function mergeBookingsLists(...lists) {
+      const map = new Map();
+      for (const list of lists) {
+        if (Array.isArray(list)) {
+          for (const b of list) {
+            if (!b) continue;
+            const compositeKey = b.id || `${b.studentId || b.studentName}|${b.date}|${b.time}`;
+            if (!map.has(compositeKey)) {
+              map.set(compositeKey, b);
+            } else {
+              const existing = map.get(compositeKey);
+              map.set(compositeKey, { ...existing, ...b });
+            }
+          }
+        }
+      }
+      return Array.from(map.values());
+    }
+
+    // Inspecciona todas las claves en localStorage y extrae datos
+    function scanAllLocalStorageData() {
+      const allHistoricalKeys = [
+        'roberto_dashboard_v15_restore_classes',
+        'roberto_dashboard_v14_zero_balances',
+        'roberto_dashboard_v13_clear_classes',
+        'roberto_dashboard_v12_modal_update',
+        'roberto_dashboard_v11_restore_tasks',
+        'roberto_dashboard_v10_data_fix',
+        'roberto_dashboard_v9_finanzas_fix',
+        'roberto_dashboard_v8_finanzas',
+        'roberto_dashboard_v7_friday_and_pending',
+        'roberto_dashboard_v6_schedule',
+        'roberto_dashboard_v6',
+        'roberto_dashboard_v5_rates',
+        'roberto_dashboard_v4_students',
+        'roberto_dashboard_v3_clean',
+        'roberto_dashboard_v2_es',
+        'roberto_dashboard_v2_data',
+        'roberto_dashboard_v1'
+      ];
+
+      const keySet = new Set(allHistoricalKeys);
+      try {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && (k.startsWith('roberto_dashboard') || k.includes('roberto'))) {
+            keySet.add(k);
+          }
+        }
+      } catch(e) {}
+
+      const reports = [];
+      let mergedClasses = [];
+      let mergedBookings = [];
+      let foundTasks = [];
+      let foundPayments = [];
+      let foundFinanzas = null;
+      let foundStudents = [];
+
+      for (const key of keySet) {
+        try {
+          const val = localStorage.getItem(key);
+          if (val) {
+            const parsed = JSON.parse(val);
+            const classCount = Array.isArray(parsed.classes) ? parsed.classes.length : 0;
+            const bookingCount = Array.isArray(parsed.bookings) ? parsed.bookings.length : 0;
+            reports.push({ key, classCount, bookingCount, data: parsed });
+
+            if (Array.isArray(parsed.classes) && parsed.classes.length > 0) {
+              mergedClasses = mergeClassesLists(mergedClasses, parsed.classes);
+            }
+            if (Array.isArray(parsed.bookings) && parsed.bookings.length > 0) {
+              mergedBookings = mergeBookingsLists(mergedBookings, parsed.bookings);
+            }
+            if (foundTasks.length === 0 && Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
+              foundTasks = parsed.tasks;
+            }
+            if (foundPayments.length === 0 && Array.isArray(parsed.payments) && parsed.payments.length > 0) {
+              foundPayments = parsed.payments;
+            }
+            if (!foundFinanzas && parsed.finanzas) {
+              foundFinanzas = parsed.finanzas;
+            }
+            if (foundStudents.length === 0 && Array.isArray(parsed.students) && parsed.students.length > 0) {
+              foundStudents = parsed.students;
+            }
+          }
+        } catch (e) {}
+      }
+
+      return {
+        reports,
+        mergedClasses,
+        mergedBookings,
+        foundTasks,
+        foundPayments,
+        foundFinanzas,
+        foundStudents
+      };
+    }
+
     function App() {
       const [data, setData] = useState(() => {
         try {
-          // Lista exhaustiva de claves históricas en orden cronológico inverso
-          const allHistoricalKeys = [
-            'roberto_dashboard_v14_zero_balances',
-            'roberto_dashboard_v13_clear_classes',
-            'roberto_dashboard_v12_modal_update',
-            'roberto_dashboard_v11_restore_tasks',
-            'roberto_dashboard_v10_data_fix',
-            'roberto_dashboard_v9_finanzas_fix',
-            'roberto_dashboard_v8_finanzas',
-            'roberto_dashboard_v7_friday_and_pending',
-            'roberto_dashboard_v6_schedule',
-            'roberto_dashboard_v6',
-            'roberto_dashboard_v5_rates',
-            'roberto_dashboard_v4_students',
-            'roberto_dashboard_v3_clean',
-            'roberto_dashboard_v2_es',
-            'roberto_dashboard_v2_data',
-            'roberto_dashboard_v1'
-          ];
-
+          const scan = scanAllLocalStorageData();
           let baseData = null;
           const saved = localStorage.getItem(STORAGE_KEY);
           if (saved) {
@@ -376,92 +482,31 @@
             } catch (e) {}
           }
 
-          // Si ya tenemos baseData y tiene clases, usarlo directamente
-          if (baseData && Array.isArray(baseData.classes) && baseData.classes.length > 0) {
-            return {
-              ...baseData,
-              payments: deduplicatePaymentsList(baseData.payments || [])
-            };
-          }
+          // Combinar las clases de baseData con TODAS las clases encontradas en cualquier clave previa
+          const allCandidateClasses = mergeClassesLists(
+            (baseData && Array.isArray(baseData.classes)) ? baseData.classes : [],
+            scan.mergedClasses,
+            INITIAL_DATA.classes
+          );
 
-          // Si baseData no tiene clases (o no existe), buscamos clases, tareas, etc. en el historial
-          let foundTasks = (baseData && baseData.tasks) || [];
-          let foundClasses = (baseData && baseData.classes) || [];
-          let foundBookings = (baseData && baseData.bookings) || [];
-          let foundPayments = (baseData && baseData.payments) || [];
-          let foundFinanzas = (baseData && baseData.finanzas) || null;
-
-          // Escaneo de claves históricas
-          for (const key of allHistoricalKeys) {
-            try {
-              const val = localStorage.getItem(key);
-              if (val) {
-                const parsed = JSON.parse(val);
-                if ((!foundClasses || foundClasses.length === 0) && Array.isArray(parsed.classes) && parsed.classes.length > 0) {
-                  foundClasses = parsed.classes;
-                }
-                if ((!foundBookings || foundBookings.length === 0) && Array.isArray(parsed.bookings) && parsed.bookings.length > 0) {
-                  foundBookings = parsed.bookings;
-                }
-                if ((!foundTasks || foundTasks.length === 0) && Array.isArray(parsed.tasks) && parsed.tasks.length > 0) {
-                  foundTasks = parsed.tasks;
-                }
-                if ((!foundPayments || foundPayments.length === 0) && Array.isArray(parsed.payments) && parsed.payments.length > 0) {
-                  foundPayments = parsed.payments;
-                }
-                if (!foundFinanzas && parsed.finanzas) {
-                  foundFinanzas = parsed.finanzas;
-                }
-              }
-            } catch (err) {
-              console.warn('Error reading key', key, err);
-            }
-          }
-
-          // Fallback scan: cualquier otra clave en localStorage
-          try {
-            for (let i = 0; i < localStorage.length; i++) {
-              const k = localStorage.key(i);
-              if (k && k.startsWith('roberto_dashboard')) {
-                const v = localStorage.getItem(k);
-                if (v) {
-                  const p = JSON.parse(v);
-                  if ((!foundClasses || foundClasses.length === 0) && Array.isArray(p.classes) && p.classes.length > 0) {
-                    foundClasses = p.classes;
-                  }
-                  if ((!foundBookings || foundBookings.length === 0) && Array.isArray(p.bookings) && p.bookings.length > 0) {
-                    foundBookings = p.bookings;
-                  }
-                  if ((!foundTasks || foundTasks.length === 0) && Array.isArray(p.tasks) && p.tasks.length > 0) {
-                    foundTasks = p.tasks;
-                  }
-                  if ((!foundPayments || foundPayments.length === 0) && Array.isArray(p.payments) && p.payments.length > 0) {
-                    foundPayments = p.payments;
-                  }
-                  if (!foundFinanzas && p.finanzas) {
-                    foundFinanzas = p.finanzas;
-                  }
-                }
-              }
-            }
-          } catch (e) {}
-
-          const resultClasses = (foundClasses && foundClasses.length > 0)
-            ? foundClasses
-            : ((baseData && Array.isArray(baseData.classes) && baseData.classes.length > 0) ? baseData.classes : INITIAL_DATA.classes);
-
-          const resultBookings = (foundBookings && foundBookings.length > 0)
-            ? foundBookings
-            : ((baseData && Array.isArray(baseData.bookings) && baseData.bookings.length > 0) ? baseData.bookings : INITIAL_DATA.bookings);
+          const allCandidateBookings = mergeBookingsLists(
+            (baseData && Array.isArray(baseData.bookings)) ? baseData.bookings : [],
+            scan.mergedBookings,
+            INITIAL_DATA.bookings
+          );
 
           const result = {
             ...(baseData || INITIAL_DATA),
-            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : ((baseData && baseData.tasks) || INITIAL_DATA.tasks),
-            classes: resultClasses,
-            bookings: resultBookings,
-            payments: (foundPayments && foundPayments.length > 0) ? deduplicatePaymentsList(foundPayments) : ((baseData && baseData.payments) || INITIAL_DATA.payments || []),
-            students: (baseData && baseData.students && baseData.students.length > 0) ? baseData.students : INITIAL_DATA.students,
-            finanzas: foundFinanzas || (baseData && baseData.finanzas) || INITIAL_DATA.finanzas
+            tasks: (baseData && Array.isArray(baseData.tasks) && baseData.tasks.length > 0) 
+              ? baseData.tasks 
+              : ((scan.foundTasks && scan.foundTasks.length > 0) ? scan.foundTasks : INITIAL_DATA.tasks),
+            classes: allCandidateClasses.length > 0 ? allCandidateClasses : INITIAL_DATA.classes,
+            bookings: allCandidateBookings.length > 0 ? allCandidateBookings : INITIAL_DATA.bookings,
+            payments: deduplicatePaymentsList((baseData && baseData.payments) || scan.foundPayments || INITIAL_DATA.payments || []),
+            students: (baseData && Array.isArray(baseData.students) && baseData.students.length > 0)
+              ? baseData.students
+              : ((scan.foundStudents && scan.foundStudents.length > 0) ? scan.foundStudents : INITIAL_DATA.students),
+            finanzas: (baseData && baseData.finanzas) || scan.foundFinanzas || INITIAL_DATA.finanzas
           };
 
           return result;
@@ -497,17 +542,13 @@
             isInitialCloudLoadComplete.current = true;
             setData(prev => {
               const cloudData = records.data;
-              const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
-                ? cloudData.classes
-                : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
-              const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
-                ? cloudData.bookings
-                : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
+              const mergedClasses = mergeClassesLists(prev.classes || [], cloudData.classes || []);
+              const mergedBookings = mergeBookingsLists(prev.bookings || [], cloudData.bookings || []);
               return {
                 ...prev,
                 ...cloudData,
-                classes: mergedClasses,
-                bookings: mergedBookings
+                classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
+                bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
               };
             });
             setSyncStatus('synced');
@@ -542,18 +583,13 @@
               isInitialCloudLoadComplete.current = true;
               setData(prev => {
                 const cloudData = records.data;
-                // Si la nube no tiene clases pero el navegador local sí tenía clases guardadas (o DEFAULT), proteger
-                const mergedClasses = (Array.isArray(cloudData.classes) && cloudData.classes.length > 0)
-                  ? cloudData.classes
-                  : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
-                const mergedBookings = (Array.isArray(cloudData.bookings) && cloudData.bookings.length > 0)
-                  ? cloudData.bookings
-                  : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
+                const mergedClasses = mergeClassesLists(prev.classes || [], cloudData.classes || []);
+                const mergedBookings = mergeBookingsLists(prev.bookings || [], cloudData.bookings || []);
                 return {
                   ...prev,
                   ...cloudData,
-                  classes: mergedClasses,
-                  bookings: mergedBookings
+                  classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
+                  bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
                 };
               });
               setSyncStatus('synced');
@@ -594,17 +630,13 @@
                   isRemoteUpdateRef.current = true;
                   setData(prev => {
                     const newData = payload.new.data;
-                    const mergedClasses = (Array.isArray(newData.classes) && newData.classes.length > 0)
-                      ? newData.classes
-                      : ((prev.classes && prev.classes.length > 0) ? prev.classes : INITIAL_DATA.classes);
-                    const mergedBookings = (Array.isArray(newData.bookings) && newData.bookings.length > 0)
-                      ? newData.bookings
-                      : ((prev.bookings && prev.bookings.length > 0) ? prev.bookings : INITIAL_DATA.bookings);
+                    const mergedClasses = mergeClassesLists(prev.classes || [], newData.classes || []);
+                    const mergedBookings = mergeBookingsLists(prev.bookings || [], newData.bookings || []);
                     return {
                       ...prev,
                       ...newData,
-                      classes: mergedClasses,
-                      bookings: mergedBookings
+                      classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
+                      bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
                     };
                   });
                   setSyncStatus('synced');
@@ -790,73 +822,25 @@
       };
 
       const restoreClassesFromHistory = () => {
-        const allHistoricalKeys = [
-          'roberto_dashboard_v14_zero_balances',
-          'roberto_dashboard_v13_clear_classes',
-          'roberto_dashboard_v12_modal_update',
-          'roberto_dashboard_v11_restore_tasks',
-          'roberto_dashboard_v10_data_fix',
-          'roberto_dashboard_v9_finanzas_fix',
-          'roberto_dashboard_v8_finanzas',
-          'roberto_dashboard_v7_friday_and_pending',
-          'roberto_dashboard_v6_schedule',
-          'roberto_dashboard_v6',
-          'roberto_dashboard_v5_rates',
-          'roberto_dashboard_v4_students',
-          'roberto_dashboard_v3_clean',
-          'roberto_dashboard_v2_es',
-          'roberto_dashboard_v2_data',
-          'roberto_dashboard_v1'
-        ];
+        const scan = scanAllLocalStorageData();
+        setModal({
+          type: 'restore_diagnostics',
+          scan
+        });
+      };
 
-        let found = [];
-        let foundBookings = [];
-
-        // Revisar claves históricas
-        for (const k of allHistoricalKeys) {
-          try {
-            const val = localStorage.getItem(k);
-            if (val) {
-              const p = JSON.parse(val);
-              if (Array.isArray(p.classes) && p.classes.length > 0 && found.length === 0) {
-                found = p.classes;
-              }
-              if (Array.isArray(p.bookings) && p.bookings.length > 0 && foundBookings.length === 0) {
-                foundBookings = p.bookings;
-              }
-            }
-          } catch(e) {}
-        }
-
-        // Revisar cualquier otra clave en localStorage
-        try {
-          for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.startsWith('roberto_dashboard')) {
-              const val = localStorage.getItem(k);
-              if (val) {
-                const p = JSON.parse(val);
-                if (Array.isArray(p.classes) && p.classes.length > 0 && found.length === 0) {
-                  found = p.classes;
-                }
-                if (Array.isArray(p.bookings) && p.bookings.length > 0 && foundBookings.length === 0) {
-                  foundBookings = p.bookings;
-                }
-              }
-            }
-          }
-        } catch(e) {}
-
-        if (found.length > 0) {
-          setData(prev => ({
+      const applyRestoredClasses = (selectedClasses, selectedBookings) => {
+        setData(prev => {
+          const mergedClasses = mergeClassesLists(prev.classes || [], selectedClasses || []);
+          const mergedBookings = mergeBookingsLists(prev.bookings || [], selectedBookings || []);
+          return {
             ...prev,
-            classes: found,
-            bookings: (foundBookings.length > 0) ? foundBookings : prev.bookings
-          }));
-          showToast(`¡Se restauraron ${found.length} clases encontradas en el historial local!`);
-        } else {
-          showToast("No se encontraron clases anteriores en la memoria de este navegador.", "error");
-        }
+            classes: mergedClasses.length > 0 ? mergedClasses : INITIAL_DATA.classes,
+            bookings: mergedBookings.length > 0 ? mergedBookings : INITIAL_DATA.bookings
+          };
+        });
+        setModal(null);
+        showToast(`¡Se restauraron ${selectedClasses.length} clases con éxito!`);
       };
 
       const resetStudentBalances = () => {
@@ -1416,6 +1400,7 @@
               onSaveStudent={saveStudent}
               onSaveBooking={saveBooking}
               onSavePayment={savePayment}
+              onApplyRestoredClasses={applyRestoredClasses}
             />
           )}
         </div>
@@ -3509,7 +3494,63 @@
     // ----------------------------------------------------
 
 
-    function ModalDialog({ modal, data, onClose, onSaveTask, onSaveClass, onSaveStudent, onSaveBooking, onSavePayment }) {
+    function RestoreDiagnosticsView({ scan, currentClassesCount, onRestore, onClose }) {
+      const { reports = [], mergedClasses = [], mergedBookings = [] } = scan || {};
+      const sortedReports = [...reports].sort((a, b) => b.classCount - a.classCount);
+
+      return (
+        <div className="space-y-4 text-xs">
+          <div className="p-3.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 space-y-1">
+            <div className="font-bold flex items-center gap-2">
+              <Icons.Refresh /> Clases encontradas en el historial del navegador
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              El explorador analizó todas las versiones y copias guardadas en este navegador. Se encontraron un total de <strong>{mergedClasses.length} clases únicas</strong> registradas por ti.
+            </p>
+          </div>
+
+          <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800 max-h-56 overflow-y-auto">
+            {sortedReports.map((r, i) => (
+              <div key={r.key} className="p-3 flex items-center justify-between bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
+                <div>
+                  <div className="font-mono text-[11px] font-bold text-slate-800 dark:text-slate-200">{r.key}</div>
+                  <div className="text-[10px] text-slate-400">
+                    {r.classCount} clases • {r.bookingCount} reservas
+                  </div>
+                </div>
+                {r.classCount > 0 && (
+                  <button
+                    onClick={() => onRestore(r.data.classes || [], r.data.bookings || [])}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition"
+                  >
+                    Restaurar solo esta ({r.classCount})
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row gap-2.5 justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold"
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              onClick={() => onRestore(mergedClasses, mergedBookings)}
+              className="px-5 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white font-extrabold shadow-md shadow-accent/20 transition flex items-center justify-center gap-2"
+            >
+              <Icons.Check /> Restaurar y Fusionar Todas ({mergedClasses.length} clases)
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function ModalDialog({ modal, data, onClose, onSaveTask, onSaveClass, onSaveStudent, onSaveBooking, onSavePayment, onApplyRestoredClasses }) {
       const { type, item } = modal;
 
       useEffect(() => {
@@ -3525,7 +3566,8 @@
         class: item ? 'Editar Clase' : 'Programar Nueva Clase',
         student: item ? 'Editar Alumno' : 'Nuevo Alumno',
         booking: item ? 'Editar Reserva' : 'Nueva Reserva de Clase',
-        payment: item ? 'Editar Pago / Factura' : 'Registrar Pago / Factura'
+        payment: item ? 'Editar Pago / Factura' : 'Registrar Pago / Factura',
+        restore_diagnostics: 'Recuperar Clases desde el Historial del Navegador'
       };
 
       return (
@@ -3555,6 +3597,14 @@
                 )}
                 {type === 'payment' && (
                   <PaymentForm item={item} students={data?.students || []} onSave={onSavePayment} onCancel={onClose} />
+                )}
+                {type === 'restore_diagnostics' && (
+                  <RestoreDiagnosticsView
+                    scan={modal.scan}
+                    currentClassesCount={(data?.classes || []).length}
+                    onRestore={onApplyRestoredClasses}
+                    onClose={onClose}
+                  />
                 )}
               </ErrorBoundary>
             </div>
