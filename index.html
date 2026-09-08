@@ -2675,6 +2675,31 @@
     // ----------------------------------------------------
     // COMPONENTE MODAL UNIFICADO
     // ----------------------------------------------------
+        class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("Modal Error caught:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-4 bg-rose-50 text-rose-800 rounded-lg text-xs space-y-2">
+              <h4 className="font-bold">Ocurrió un error al cargar este formulario:</h4>
+              <p className="font-mono bg-rose-100 p-2 rounded">{String(this.state.error?.message || this.state.error)}</p>
+              <button onClick={() => this.setState({ hasError: false, error: null })} className="px-3 py-1 bg-rose-600 text-white rounded font-bold">Reintentar</button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
     function ModalDialog({ modal, data, onClose, onSaveTask, onSaveClass, onSaveStudent, onSaveBooking, onSavePayment }) {
       const { type, item } = modal;
 
@@ -2706,21 +2731,23 @@
             </div>
 
             <div className="py-4">
-              {type === 'task' && (
-                <TaskForm item={item} onSave={onSaveTask} onCancel={onClose} />
-              )}
-              {type === 'class' && (
-                <ClassForm item={item} defaultDate={modal?.defaultDate} students={data.students} onSave={onSaveClass} onCancel={onClose} />
-              )}
-              {type === 'student' && (
-                <StudentForm item={item} onSave={onSaveStudent} onCancel={onClose} />
-              )}
-              {type === 'booking' && (
-                <BookingForm item={item} students={data.students} classes={data.classes} onSave={onSaveBooking} onCancel={onClose} />
-              )}
-              {type === 'payment' && (
-                <PaymentForm item={item} students={data.students} onSave={onSavePayment} onCancel={onClose} />
-              )}
+              <ErrorBoundary>
+                {type === 'task' && (
+                  <TaskForm item={item} onSave={onSaveTask} onCancel={onClose} />
+                )}
+                {type === 'class' && (
+                  <ClassForm item={item} defaultDate={modal?.defaultDate} students={data?.students || []} onSave={onSaveClass} onCancel={onClose} />
+                )}
+                {type === 'student' && (
+                  <StudentForm item={item} onSave={onSaveStudent} onCancel={onClose} />
+                )}
+                {type === 'booking' && (
+                  <BookingForm item={item} students={data?.students || []} classes={data?.classes || []} onSave={onSaveBooking} onCancel={onClose} />
+                )}
+                {type === 'payment' && (
+                  <PaymentForm item={item} students={data?.students || []} onSave={onSavePayment} onCancel={onClose} />
+                )}
+              </ErrorBoundary>
             </div>
 
           </div>
@@ -2838,21 +2865,25 @@
 
     function ClassForm({ item, defaultDate, students = [], onSave, onCancel }) {
       const studentList = Array.isArray(students) ? students : [];
-      const [selectedStudentId, setSelectedStudentId] = useState(
-        item ? (item.enrolledStudentIds?.[0] || '') : (studentList[0]?.id || '')
-      );
-      const [subject, setSubject] = useState(item ? item.subject : 'Tutoría');
-      const [dayOfWeek, setDayOfWeek] = useState(item ? item.dayOfWeek : 'Lunes');
-      const [date, setDate] = useState(item?.date || defaultDate || new Date().toISOString().slice(0, 10));
-      const [time, setTime] = useState(item ? item.time : '18:00');
-      const [durationMinutes, setDurationMinutes] = useState(item ? item.durationMinutes : 60);
-      const [location, setLocation] = useState(item ? item.location : '');
-      const [description, setDescription] = useState(item ? item.description : '');
-      const [autoInvoice, setAutoInvoice] = useState(!item);
+      const [selectedStudentId, setSelectedStudentId] = useState(() => {
+        if (item && item.enrolledStudentIds && item.enrolledStudentIds.length > 0) {
+          return item.enrolledStudentIds[0];
+        }
+        return (studentList.length > 0 && studentList[0]) ? studentList[0].id : '';
+      });
+
+      const [subject, setSubject] = useState(() => item?.subject || 'Tutoría');
+      const [dayOfWeek, setDayOfWeek] = useState(() => item?.dayOfWeek || 'Lunes');
+      const [date, setDate] = useState(() => item?.date || defaultDate || new Date().toISOString().slice(0, 10));
+      const [time, setTime] = useState(() => item?.time || '18:00');
+      const [durationMinutes, setDurationMinutes] = useState(() => item?.durationMinutes || 60);
+      const [location, setLocation] = useState(() => item?.location || '');
+      const [description, setDescription] = useState(() => item?.description || '');
+      const [autoInvoice, setAutoInvoice] = useState(() => !item);
 
       // Calcular nombre automático: "Clase con [Nombre del Estudiante]"
-      const currentStudent = studentList.find(s => s.id === selectedStudentId);
-      const generatedClassName = currentStudent ? `Clase con ${currentStudent.name}` : (item?.name || 'Clase individual');
+      const currentStudent = studentList.find(s => s && s.id === selectedStudentId);
+      const generatedClassName = currentStudent ? ('Clase con ' + currentStudent.name) : (item?.name || 'Clase individual');
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -2863,16 +2894,16 @@
           id: item?.id,
           name: generatedClassName,
           subject: subject || 'Tutoría',
-          dayOfWeek,
-          date,
-          time,
-          durationMinutes: Number(durationMinutes),
-          location,
+          dayOfWeek: dayOfWeek || 'Lunes',
+          date: date || new Date().toISOString().slice(0, 10),
+          time: time || '18:00',
+          durationMinutes: Number(durationMinutes) || 60,
+          location: location || '',
           capacity: 1,
-          description: description || `Sesión de ${durationMinutes} min`,
+          description: description || ('Sesión de ' + (durationMinutes || 60) + ' min'),
           enrolledStudentIds: selectedStudentId ? [selectedStudentId] : [],
           status: item?.status || 'Programada',
-          autoInvoice
+          autoInvoice: Boolean(autoInvoice)
         });
       };
 
