@@ -526,11 +526,12 @@
               isInitialCloudLoadComplete.current = true;
               setData(prev => {
                 const cloudData = records.data;
+                // Si en la nube las clases son undefined o no es array, usar []; de lo contrario respetar estrictamente lo que hay en la nube
                 return {
                   ...prev,
                   ...cloudData,
-                  classes: Array.isArray(cloudData.classes) ? cloudData.classes : (prev.classes || []),
-                  bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : (prev.bookings || [])
+                  classes: Array.isArray(cloudData.classes) ? cloudData.classes : [],
+                  bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : []
                 };
               });
               setSyncStatus('synced');
@@ -574,8 +575,8 @@
                     return {
                       ...prev,
                       ...newData,
-                      classes: Array.isArray(newData.classes) ? newData.classes : (prev.classes || []),
-                      bookings: Array.isArray(newData.bookings) ? newData.bookings : (prev.bookings || [])
+                      classes: Array.isArray(newData.classes) ? newData.classes : [],
+                      bookings: Array.isArray(newData.bookings) ? newData.bookings : []
                     };
                   });
                   setSyncStatus('synced');
@@ -633,7 +634,7 @@
             } catch (err) {
               setSyncStatus('offline');
             }
-          }, 600);
+          }, 300);
           return () => clearTimeout(timeoutId);
         }
       }, [data]);
@@ -841,10 +842,38 @@
         }
       };
 
-      const deleteClass = (id) => {
+      const deleteClass = async (id) => {
         if (confirm("¿Estás seguro de que deseas eliminar este horario de clase?")) {
-          setData(prev => ({ ...prev, classes: prev.classes.filter(c => c.id !== id) }));
-          showToast("Clase eliminada", "info");
+          const updatedClasses = (data.classes || []).filter(c => c.id !== id);
+          const updatedBookings = (data.bookings || []).filter(b => b.classId !== id);
+          const updatedData = { ...data, classes: updatedClasses, bookings: updatedBookings };
+
+          // 1. Guardar de inmediato en localStorage
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedData));
+          } catch (e) {}
+
+          // 2. Actualizar estado
+          setData(updatedData);
+
+          // 3. Enviar inmediatamente a Supabase
+          if (supabaseClient) {
+            try {
+              setSyncStatus('syncing');
+              await supabaseClient
+                .from('dashboard_state')
+                .upsert({
+                  id: 'roberto_main',
+                  data: updatedData,
+                  updated_at: new Date().toISOString()
+                });
+              setSyncStatus('synced');
+            } catch (err) {
+              console.warn("Error al borrar clase en Supabase", err);
+            }
+          }
+
+          showToast("Clase eliminada permanentemente", "info");
         }
       };
 
