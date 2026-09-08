@@ -2532,7 +2532,7 @@
       const timelineStartMin = 7 * 60; // 7:00 AM
       const timelineEndMin = 24 * 60;  // 12:00 AM (midnight)
       const totalTimelineMin = timelineEndMin - timelineStartMin; // 17 hours = 1020 mins
-      const hourColWidth = 140; // px por hora
+      const hourColWidth = 180; // px por hora para mayor espacio de lectura
 
       return (
         <div className="space-y-6">
@@ -2636,7 +2636,7 @@
                 </div>
 
                 {/* FILA 1: PISTA PRINCIPAL DE CLASES (TIMELINE VISUAL) */}
-                <div className="relative h-44 bg-slate-50/30 dark:bg-slate-900/40">
+                <div className="relative min-h-[14rem] h-auto bg-slate-50/30 dark:bg-slate-900/40 py-3">
                   {/* Rejilla de fondo (líneas verticales de cada hora) */}
                   <div className="absolute inset-0 flex pointer-events-none">
                     {hours.map(h => (
@@ -2666,23 +2666,23 @@
                       const minSinceStart = Math.max(0, evt.startMinutes - timelineStartMin);
                       const pxPerMinute = hourColWidth / 60;
                       const leftPx = minSinceStart * pxPerMinute;
-                      const widthPx = Math.max(hourColWidth - 10, evt.duration * pxPerMinute);
+                      const widthPx = Math.max(hourColWidth - 8, evt.duration * pxPerMinute);
 
                       return (
                         <div
                           key={evt.id}
                           style={{
-                            left: `${leftPx + 6}px`,
-                            width: `${widthPx - 12}px`,
-                            top: '12px',
-                            bottom: '12px'
+                            left: `${leftPx + 4}px`,
+                            width: `${widthPx - 8}px`,
+                            top: '8px',
+                            bottom: '8px'
                           }}
-                          className="absolute z-10 rounded-xl p-3 shadow-md border transition-all duration-200 flex flex-col justify-between overflow-hidden bg-sky-50 dark:bg-sky-950/80 border-sky-200 dark:border-sky-800 text-sky-950 dark:text-sky-100 hover:shadow-lg hover:border-sky-400"
+                          className="absolute z-10 rounded-xl p-3 shadow-md border transition-all duration-200 flex flex-col justify-between overflow-y-auto bg-sky-50 dark:bg-sky-950/90 border-sky-200 dark:border-sky-800 text-sky-950 dark:text-sky-100 hover:shadow-lg hover:border-sky-400"
                         >
                           <div>
                             {/* Cabecera del bloque: Nombre y Badge */}
-                            <div className="flex items-start justify-between gap-1">
-                              <h4 className="font-extrabold text-xs text-sky-900 dark:text-sky-200 truncate leading-tight" title={evt.title}>
+                            <div className="flex items-start justify-between gap-1.5">
+                              <h4 className="font-extrabold text-xs text-sky-900 dark:text-sky-100 leading-snug break-words whitespace-normal" title={evt.title}>
                                 {evt.title}
                               </h4>
                               <span className="text-[10px] shrink-0 text-sky-600 dark:text-sky-300 font-bold">
@@ -2690,19 +2690,22 @@
                               </span>
                             </div>
 
-                            {/* Subtítulo / Alumno */}
-                            <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
-                              {evt.subtitle}
-                            </p>
+                            {/* Subtítulo / Alumnos con Text Wrapping completo */}
+                            <div className="mt-1.5 p-1.5 rounded-lg bg-white/70 dark:bg-slate-900/60 border border-sky-200/50 dark:border-sky-900/40">
+                              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">Estudiantes:</p>
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-100 break-words whitespace-normal leading-tight mt-0.5">
+                                {evt.subtitle}
+                              </p>
+                            </div>
 
                             {/* Rango de Horario (ej: 6:00 PM - 7:00 PM) */}
-                            <div className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                              <span>{formatTimeRange(evt.startMinutes, evt.duration)}</span>
+                            <div className="mt-2 text-[10px] font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1">
+                              <span>🕒 {formatTimeRange(evt.startMinutes, evt.duration)}</span>
                             </div>
                           </div>
 
                           {/* Pie de la tarjeta: Estado y Botones rápidos */}
-                          <div className="mt-2 pt-1.5 border-t border-sky-200/50 dark:border-sky-800/60 flex items-center justify-between text-[10px]">
+                          <div className="mt-2 pt-1.5 border-t border-sky-200/50 dark:border-sky-800/60 flex flex-wrap items-center justify-between gap-1 text-[10px]">
                             <div className="flex items-center gap-1">
                               {evt.paidStatus === 'Pagado' ? (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
@@ -2719,7 +2722,7 @@
                             <div className="flex items-center gap-1">
                               <button
                                 onClick={() => onOpenModal({ type: evt.type, item: evt.rawItem })}
-                                className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700"
+                                className="px-2 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700"
                                 title="Editar"
                               >
                                 Editar
@@ -2727,7 +2730,7 @@
                               {evt.type === 'class' && (
                                 <button
                                   onClick={() => onDeleteClass(evt.rawItem.id)}
-                                  className="p-0.5 text-slate-400 hover:text-rose-500"
+                                  className="p-1 text-slate-400 hover:text-rose-500 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40"
                                   title="Eliminar clase"
                                 >
                                   ✕
@@ -2768,10 +2771,10 @@
                             {evt.duration} min
                           </span>
                         </div>
-                        <h5 className="font-bold text-sm text-slate-900 dark:text-white mt-1 truncate">
+                        <h5 className="font-bold text-sm text-slate-900 dark:text-white mt-1 break-words whitespace-normal">
                           {evt.title}
                         </h5>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 break-words whitespace-normal mt-0.5">
                           {evt.subtitle}
                         </p>
                         {evt.location && (
