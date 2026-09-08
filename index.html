@@ -138,7 +138,7 @@
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
 
-    const STORAGE_KEY = 'roberto_dashboard_v12_clean_duplicates';
+    const STORAGE_KEY = 'roberto_dashboard_v13_clear_classes';
 
     const INITIAL_DATA = {
       user: {
@@ -148,89 +148,21 @@
         hourlyRate: 1500
       },
       tasks: [],
-      classes: [
-        {
-          id: 'c-1',
-          name: 'Clase con Miguel Rojas',
-          subject: 'Tutoría',
-          dayOfWeek: 'Miércoles',
-          time: '18:00 - 19:00',
-          date: '2026-09-02',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-1'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora'
-        },
-        {
-          id: 'c-2',
-          name: 'Clase con Merari Vasquez',
-          subject: 'Tutoría',
-          dayOfWeek: 'Miércoles',
-          time: '19:00 - 20:00',
-          date: '2026-09-02',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-2'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora'
-        },
-        {
-          id: 'c-3',
-          name: 'Clase con Julio Polanco (Gratis)',
-          subject: 'Tutoría',
-          dayOfWeek: 'Jueves',
-          time: '05:30 - 06:30',
-          date: '2026-09-03',
-          durationMinutes: 60,
-          location: '',
-          capacity: 1,
-          enrolledStudentIds: ['s-6'],
-          status: 'Programada',
-          description: 'Sesión individual de 1 hora de cortesía (gratis)'
-        },
-        {
-          id: 'c-4',
-          name: 'Clase con Oriolis y Miguel',
-          subject: 'Tutoría',
-          dayOfWeek: 'Viernes',
-          time: '17:00 - 18:00',
-          date: '2026-09-04',
-          durationMinutes: 60,
-          location: '',
-          capacity: 2,
-          enrolledStudentIds: ['s-4', 's-1'],
-          status: 'Programada',
-          description: 'Sesión compartida de 1 hora a las 5:00 PM'
-        }
-      ],
+      classes: [],
       students: [
-        { id: 's-1', name: 'Miguel Rojas', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: 'Clases: Mié 18:00 y Vie 17:00 (Pendiente de pago)', balanceDue: 3000 },
-        { id: 's-2', name: 'Merari Vasquez', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: 'Clase: Mié 19:00 (Pendiente de pago)', balanceDue: 2000 },
+        { id: 's-1', name: 'Miguel Rojas', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
+        { id: 's-2', name: 'Merari Vasquez', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-3', name: 'Fabio Silvestri', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
-        { id: 's-4', name: 'Oriolis Olivero', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: 'Clase: Vie 17:00 (Pendiente de pago)', balanceDue: 1500 },
+        { id: 's-4', name: 'Oriolis Olivero', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-5', name: 'Alejandro Polanco', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
-        { id: 's-6', name: 'Julio Polanco', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: 'Clase jueves 5:30 AM es de cortesía (gratis)', balanceDue: 0 },
+        { id: 's-6', name: 'Julio Polanco', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-7', name: 'Irwin Viloria', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-8', name: 'Irwin Viloria Padre', email: '', phone: '', hourlyRate: 1500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-9', name: 'Gisselle Franco', email: '', phone: '', hourlyRate: 2500, status: 'Activo', notes: '', balanceDue: 0 },
         { id: 's-10', name: 'Jonathan Rincon', email: '', phone: '', hourlyRate: 2000, status: 'Activo', notes: '', balanceDue: 0 }
       ],
-      bookings: [
-        { id: 'b-1', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-1', className: 'Clase con Miguel Rojas', date: '2026-09-02', time: '18:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-2', studentId: 's-2', studentName: 'Merari Vasquez', classId: 'c-2', className: 'Clase con Merari Vasquez', date: '2026-09-02', time: '19:00', duration: 60, rate: 2000, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-3', studentId: 's-6', studentName: 'Julio Polanco', classId: 'c-3', className: 'Clase con Julio Polanco (Gratis)', date: '2026-09-03', time: '05:30', duration: 60, rate: 0, status: 'Confirmada', paymentStatus: 'Pagado' },
-        { id: 'b-4', studentId: 's-4', studentName: 'Oriolis Olivero', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' },
-        { id: 'b-5', studentId: 's-1', studentName: 'Miguel Rojas', classId: 'c-4', className: 'Clase con Oriolis y Miguel', date: '2026-09-04', time: '17:00', duration: 60, rate: 1500, status: 'Confirmada', paymentStatus: 'Pendiente' }
-      ],
-      payments: [
-        { id: 'inv-1', invoiceNum: 'FAC-2026-001', studentId: 's-1', studentName: 'Miguel Rojas', amount: 1500, date: '2026-09-02', dueDate: '2026-09-09', method: 'Transferencia', status: 'Pendiente', notes: 'Clase individual del Miércoles 2 sep (18:00)' },
-        { id: 'inv-2', invoiceNum: 'FAC-2026-002', studentId: 's-2', studentName: 'Merari Vasquez', amount: 2000, date: '2026-09-02', dueDate: '2026-09-09', method: 'Transferencia', status: 'Pendiente', notes: 'Clase individual del Miércoles 2 sep (19:00)' },
-        { id: 'inv-3', invoiceNum: 'FAC-2026-003', studentId: 's-4', studentName: 'Oriolis Olivero', amount: 1500, date: '2026-09-04', dueDate: '2026-09-11', method: 'Transferencia', status: 'Pendiente', notes: 'Clase compartida del Viernes 4 sep (17:00)' },
-        { id: 'inv-4', invoiceNum: 'FAC-2026-004', studentId: 's-1', studentName: 'Miguel Rojas', amount: 1500, date: '2026-09-04', dueDate: '2026-09-11', method: 'Transferencia', status: 'Pendiente', notes: 'Clase compartida del Viernes 4 sep (17:00)' }
-      ],
+      bookings: [],
+      payments: [],
       finanzas: {
         capitalActual: 0,
         dineroDisponible: 0,
@@ -368,13 +300,12 @@
             }
           } catch (e) {}
 
-          const initialOrFoundPayments = (foundPayments && foundPayments.length > 0) ? foundPayments : INITIAL_DATA.payments;
           return {
             ...INITIAL_DATA,
             tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : INITIAL_DATA.tasks,
-            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : INITIAL_DATA.classes,
-            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : INITIAL_DATA.bookings,
-            payments: deduplicatePaymentsList(initialOrFoundPayments),
+            classes: [], // Clases agendadas limpiadas a petición del usuario
+            bookings: [],
+            payments: [], // Facturas/pagos pendientes limpiados
             students: INITIAL_DATA.students,
             finanzas: foundFinanzas || INITIAL_DATA.finanzas
           };
@@ -600,6 +531,18 @@
         });
         setModal(null);
         showToast("Clase guardada correctamente");
+      };
+
+            const clearAllClasses = () => {
+        if (confirm("¿Estás seguro de que deseas limpiar todas las clases agendadas y pendientes? Tus tareas y alumnos se mantendrán intactos.")) {
+          setData(prev => ({
+            ...prev,
+            classes: [],
+            bookings: [],
+            payments: prev.payments.filter(p => p.status === 'Pagado') // Mantener solo pagos ya completados si los hubiera, o vaciar
+          }));
+          showToast("¡Se han limpiado todas las clases agendadas y pendientes!");
+        }
       };
 
       const deleteClass = (id) => {
@@ -1051,6 +994,7 @@
 
             {currentTab === 'classes' && (
               <ClassesView
+                onClearAllClasses={clearAllClasses}
                 classes={data.classes}
                 students={data.students}
                 searchQuery={searchQuery}
@@ -1969,7 +1913,7 @@
     // ----------------------------------------------------
     // PESTAÑA 3: CLASES Y HORARIOS
     // ----------------------------------------------------
-    function ClassesView({ classes, students, searchQuery, onOpenModal, onDeleteClass }) {
+    function ClassesView({ classes, students, searchQuery, onOpenModal, onDeleteClass, onClearAllClasses }) {
       const studentMap = useMemo(() => {
         return new Map(students.map(s => [s.id, s.name]));
       }, [students]);
@@ -1993,12 +1937,23 @@
                 Administra talleres en grupo, clases regulares, alumnos inscritos y enlaces de reunión.
               </p>
             </div>
-            <button
-              onClick={() => onOpenModal({ type: 'class' })}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
-            >
-              <Icons.Plus /> Programar Nueva Clase
-            </button>
+            <div className="flex items-center gap-2">
+              {classes.length > 0 && (
+                <button
+                  onClick={onClearAllClasses}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs font-bold border border-rose-200/50 dark:border-rose-900 transition"
+                  title="Eliminar todas las clases agendadas y pendientes"
+                >
+                  <Icons.Trash /> Limpiar Todas las Clases
+                </button>
+              )}
+              <button
+                onClick={() => onOpenModal({ type: 'class' })}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+              >
+                <Icons.Plus /> Programar Nueva Clase
+              </button>
+            </div>
           </div>
 
           {filteredClasses.length === 0 ? (
