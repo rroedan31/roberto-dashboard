@@ -2710,7 +2710,7 @@
                 <TaskForm item={item} onSave={onSaveTask} onCancel={onClose} />
               )}
               {type === 'class' && (
-                <ClassForm item={item} defaultDate={modal.defaultDate} students={data.students} onSave={onSaveClass} onCancel={onClose} />
+                <ClassForm item={item} defaultDate={modal?.defaultDate} students={data.students} onSave={onSaveClass} onCancel={onClose} />
               )}
               {type === 'student' && (
                 <StudentForm item={item} onSave={onSaveStudent} onCancel={onClose} />
@@ -2836,9 +2836,10 @@
       );
     }
 
-    function ClassForm({ item, defaultDate, students, onSave, onCancel }) {
+    function ClassForm({ item, defaultDate, students = [], onSave, onCancel }) {
+      const studentList = Array.isArray(students) ? students : [];
       const [selectedStudentId, setSelectedStudentId] = useState(
-        item ? (item.enrolledStudentIds?.[0] || '') : (students[0]?.id || '')
+        item ? (item.enrolledStudentIds?.[0] || '') : (studentList[0]?.id || '')
       );
       const [subject, setSubject] = useState(item ? item.subject : 'Tutoría');
       const [dayOfWeek, setDayOfWeek] = useState(item ? item.dayOfWeek : 'Lunes');
@@ -2850,12 +2851,12 @@
       const [autoInvoice, setAutoInvoice] = useState(!item);
 
       // Calcular nombre automático: "Clase con [Nombre del Estudiante]"
-      const currentStudent = students.find(s => s.id === selectedStudentId);
+      const currentStudent = studentList.find(s => s.id === selectedStudentId);
       const generatedClassName = currentStudent ? `Clase con ${currentStudent.name}` : (item?.name || 'Clase individual');
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (!selectedStudentId && students.length > 0) {
+        if (!selectedStudentId && studentList.length > 0) {
           return alert("Por favor selecciona un estudiante para la clase.");
         }
         onSave({
@@ -2879,7 +2880,7 @@
         <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
             <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-200">Estudiante de la Clase *</label>
-            {students.length === 0 ? (
+            {studentList.length === 0 ? (
               <p className="text-xs text-rose-500 p-2 bg-rose-50 dark:bg-rose-950/40 rounded-lg">
                 No tienes alumnos registrados aún. Regístralos en "Estudiantes y Reservas" primero.
               </p>
@@ -2890,7 +2891,7 @@
                 className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-accent text-sm"
                 required
               >
-                {students.map(s => (
+                {studentList.map(s => (
                   <option key={s.id} value={s.id}>
                     {s.name} {s.hourlyRate ? `($${s.hourlyRate}/h)` : ''}
                   </option>
