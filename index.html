@@ -505,6 +505,7 @@
           const exists = prev.classes.some(c => c.id === cls.id);
           const classId = exists ? cls.id : 'c-' + Date.now();
           const autoInvoice = cls.autoInvoice;
+          const isNonBillable = cls.billingType && cls.billingType !== 'Regular';
           
           // Remove autoInvoice from class object
           const classData = { ...cls };
@@ -516,7 +517,7 @@
             : [classData, ...prev.classes];
 
           let newPayments = [];
-          if (!exists && autoInvoice && classData.enrolledStudentIds && classData.enrolledStudentIds.length > 0) {
+          if (!exists && !isNonBillable && autoInvoice && classData.enrolledStudentIds && classData.enrolledStudentIds.length > 0) {
             classData.enrolledStudentIds.forEach((studentId, idx) => {
               const student = prev.students.find(s => s.id === studentId);
               if (student) {
@@ -536,7 +537,16 @@
             });
           }
 
-          const payments = [...newPayments, ...prev.payments];
+          // Si se editó la clase y ahora es no facturable (cortesía/gratis/reposición), remover cualquier factura pendiente previa generada para esta clase
+          let currentPayments = prev.payments;
+          if (exists && isNonBillable) {
+            currentPayments = currentPayments.filter(p => {
+              const matchesNote = p.notes && (p.notes.includes(classData.name) || p.notes.includes(cls.id));
+              return !(matchesNote && p.status === 'Pendiente');
+            });
+          }
+
+          const payments = [...newPayments, ...currentPayments];
 
           return { ...prev, classes, payments };
         });
@@ -2018,6 +2028,11 @@
                           {cls.subject}
                         </span>
                         <div className="flex items-center gap-1.5">
+                          {cls.billingType && cls.billingType !== 'Regular' && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                              {cls.billingType} ($0)
+                            </span>
+                          )}
                           <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                             {cls.status}
                           </span>
@@ -2467,6 +2482,12 @@
               studentNames = cls.enrolledStudentIds.map(sid => studentMap.get(sid) || sid);
             }
 
+            const billingType = cls.billingType || 'Regular';
+            let paidStatus = null;
+            if (billingType !== 'Regular') {
+              paidStatus = billingType; // 'Cortesía', 'Gratis', o 'Reposición'
+            }
+
             events.push({
               id: 'cls-' + cls.id,
               rawItem: cls,
@@ -2478,7 +2499,8 @@
               duration,
               endMinutes,
               status: cls.status || 'Programada',
-              paidStatus: null,
+              paidStatus,
+              billingType,
               location: cls.location || ''
             });
           }
@@ -2710,6 +2732,10 @@
                               {evt.paidStatus === 'Pagado' ? (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                                   Pagado
+                                </span>
+                              ) : evt.billingType && evt.billingType !== 'Regular' ? (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
+                                  {evt.billingType} ($0)
                                 </span>
                               ) : (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
@@ -3358,8 +3384,9 @@
       const [time, setTime] = useState((item && item.time) ? item.time : '18:00');
       const [durationMinutes, setDurationMinutes] = useState((item && item.durationMinutes) ? item.durationMinutes : 60);
       const [location, setLocation] = useState((item && item.location) ? item.location : '');
+      const [billingType, setBillingType] = useState(item ? (item.billingType || 'Regular') : 'Regular');
       const [description, setDescription] = useState((item && item.description) ? item.description : '');
-      const [autoInvoice, setAutoInvoice] = useState(!item);
+      const [autoInvoice, setAutoInvoice] = useState(!item && (!item || (item.billingType || 'Regular') === 'Regular'));
 
       const toggleStudent = (id) => {
         setSelectedStudentIds(prev => {
@@ -3386,6 +3413,8 @@
         generatedClassName = 'Clase con ' + studentNames.join(', ');
       }
 
+      const isNonBillable = billingType !== 'Regular';
+
       const handleFormSubmit = (e) => {
         e.preventDefault();
         onSave({
@@ -3398,10 +3427,11 @@
           durationMinutes: Number(durationMinutes) || 60,
           location: location || '',
           capacity: Math.max(selectedStudentIds.length, 1),
+          billingType: billingType || 'Regular',
           description: description || ('Sesión de ' + (durationMinutes || 60) + ' min'),
           enrolledStudentIds: selectedStudentIds,
           status: (item && item.status) ? item.status : 'Programada',
-          autoInvoice: Boolean(autoInvoice)
+          autoInvoice: isNonBillable ? false : Boolean(autoInvoice)
         });
       };
 
@@ -3457,6 +3487,32 @@
               <span className="text-slate-400 font-semibold shrink-0">Nombre automático:</span>
               <span className="font-bold text-accent dark:text-accent-light break-words">{generatedClassName}</span>
             </div>
+          </div>
+
+          {/* TIPO DE FACTURACIÓN: REGULAR, CORTESÍA, GRATIS, REPOSICIÓN */}
+          <div className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/60 space-y-1.5">
+            <label className="font-bold block text-slate-800 dark:text-slate-100">
+              Modalidad de Cobro de la Clase
+            </label>
+            <select
+              value={billingType}
+              onChange={(e) => {
+                const val = e.target.value;
+                setBillingType(val);
+                if (val !== 'Regular') setAutoInvoice(false);
+              }}
+              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-accent"
+            >
+              <option value="Regular">Clase Regular (Con cobro habitual)</option>
+              <option value="Cortesía">🎁 Clase de Cortesía (Sin cobro / $0)</option>
+              <option value="Gratis">⭐ Clase Gratis (Sin cobro / $0)</option>
+              <option value="Reposición">🔄 Clase de Reposición (Sin cobro / $0)</option>
+            </select>
+            {isNonBillable && (
+              <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+                <span>✓ Esta clase no generará cobro ni contará como saldo pendiente.</span>
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -3539,7 +3595,7 @@
             ></textarea>
           </div>
 
-          {!item && (
+          {!item && !isNonBillable && (
             <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
               <input 
                 type="checkbox" 
