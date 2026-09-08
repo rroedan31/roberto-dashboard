@@ -203,6 +203,67 @@
     };
 
     // ----------------------------------------------------
+    // COMPONENTE ERROR BOUNDARY (PROTECCIÓN GLOBAL CONTRA PANTALLAS EN BLANCO)
+    // ----------------------------------------------------
+    class ErrorBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false, error: null, errorInfo: null };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true, error };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("ErrorBoundary caught error:", error, errorInfo);
+        this.setState({ errorInfo });
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50 dark:bg-slate-900">
+              <div className="max-w-lg w-full bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-xl border border-rose-200 dark:border-rose-900/50 space-y-4">
+                <div className="flex items-center gap-3 text-rose-600 dark:text-rose-400">
+                  <span className="text-2xl">⚠️</span>
+                  <h3 className="text-base font-bold">Ocurrió un error al cargar la vista</h3>
+                </div>
+                <p className="text-xs text-slate-600 dark:text-slate-300">
+                  Se ha producido una excepción al renderizar:
+                </p>
+                <div className="p-3 bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 rounded-lg text-xs font-mono break-all max-h-40 overflow-y-auto">
+                  {String(this.state.error && (this.state.error.stack || this.state.error.message || this.state.error))}
+                </div>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    onClick={() => {
+                      this.setState({ hasError: false, error: null });
+                      window.location.reload();
+                    }}
+                    className="flex-1 py-2 px-4 rounded-xl bg-accent text-white text-xs font-bold shadow hover:bg-accent-dark transition"
+                  >
+                    Recargar Página
+                  </button>
+                  <button
+                    onClick={() => {
+                      try {
+                        localStorage.removeItem('roberto_dashboard_v14_zero_balances');
+                      } catch(e) {}
+                      window.location.reload();
+                    }}
+                    className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200 transition"
+                    title="Restablece la memoria local corrupta"
+                  >
+                    Limpiar Caché Local
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
+
+    // ----------------------------------------------------
     // COMPONENTE PRINCIPAL DE LA APLICACIÓN
     // ----------------------------------------------------
     // Función auxiliar para eliminar facturas duplicadas
@@ -261,11 +322,11 @@
           }
 
           // Si baseData no tiene clases (o no existe), buscamos clases, tareas, etc. en el historial
-          let foundTasks = baseData?.tasks || [];
-          let foundClasses = baseData?.classes || [];
-          let foundBookings = baseData?.bookings || [];
-          let foundPayments = baseData?.payments || [];
-          let foundFinanzas = baseData?.finanzas || null;
+          let foundTasks = (baseData && baseData.tasks) || [];
+          let foundClasses = (baseData && baseData.classes) || [];
+          let foundBookings = (baseData && baseData.bookings) || [];
+          let foundPayments = (baseData && baseData.payments) || [];
+          let foundFinanzas = (baseData && baseData.finanzas) || null;
 
           // Escaneo de claves históricas
           for (const key of allHistoricalKeys) {
@@ -324,12 +385,12 @@
 
           const result = {
             ...(baseData || INITIAL_DATA),
-            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : (baseData?.tasks || INITIAL_DATA.tasks),
-            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : (baseData?.classes || INITIAL_DATA.classes || []),
-            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : (baseData?.bookings || INITIAL_DATA.bookings || []),
-            payments: (foundPayments && foundPayments.length > 0) ? deduplicatePaymentsList(foundPayments) : (baseData?.payments || INITIAL_DATA.payments || []),
-            students: (baseData?.students && baseData.students.length > 0) ? baseData.students : INITIAL_DATA.students,
-            finanzas: foundFinanzas || baseData?.finanzas || INITIAL_DATA.finanzas
+            tasks: (foundTasks && foundTasks.length > 0) ? foundTasks : ((baseData && baseData.tasks) || INITIAL_DATA.tasks),
+            classes: (foundClasses && foundClasses.length > 0) ? foundClasses : ((baseData && baseData.classes) || INITIAL_DATA.classes || []),
+            bookings: (foundBookings && foundBookings.length > 0) ? foundBookings : ((baseData && baseData.bookings) || INITIAL_DATA.bookings || []),
+            payments: (foundPayments && foundPayments.length > 0) ? deduplicatePaymentsList(foundPayments) : ((baseData && baseData.payments) || INITIAL_DATA.payments || []),
+            students: (baseData && baseData.students && baseData.students.length > 0) ? baseData.students : INITIAL_DATA.students,
+            finanzas: foundFinanzas || (baseData && baseData.finanzas) || INITIAL_DATA.finanzas
           };
 
           return result;
@@ -3375,30 +3436,7 @@
     // ----------------------------------------------------
     // COMPONENTE MODAL UNIFICADO
     // ----------------------------------------------------
-        class ErrorBoundary extends React.Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false, error: null };
-      }
-      static getDerivedStateFromError(error) {
-        return { hasError: true, error };
-      }
-      componentDidCatch(error, errorInfo) {
-        console.error("Modal Error caught:", error, errorInfo);
-      }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="p-4 bg-rose-50 text-rose-800 rounded-lg text-xs space-y-2">
-              <h4 className="font-bold">Ocurrió un error al cargar este formulario:</h4>
-              <p className="font-mono bg-rose-100 p-2 rounded">{String(this.state.error?.message || this.state.error)}</p>
-              <button onClick={() => this.setState({ hasError: false, error: null })} className="px-3 py-1 bg-rose-600 text-white rounded font-bold">Reintentar</button>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
-    }
+
 
     function ModalDialog({ modal, data, onClose, onSaveTask, onSaveClass, onSaveStudent, onSaveBooking, onSavePayment }) {
       const { type, item } = modal;
@@ -4235,7 +4273,11 @@
 
     // Renderizar la aplicación React
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
