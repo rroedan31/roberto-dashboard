@@ -992,83 +992,85 @@
 
           {/* VISTAS PRINCIPALES */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {currentTab === 'overview' && (
-              <OverviewView
-                data={data}
-                kpis={kpis}
-                searchQuery={searchQuery}
-                onOpenModal={setModal}
-                onToggleTask={toggleTaskStatus}
-                onMarkPaid={markPaymentPaid}
-                onUpdateClassStatus={updateClassStatus}
-                onSwitchTab={setCurrentTab}
-              />
-            )}
+            <ErrorBoundary>
+              {currentTab === 'overview' && (
+                <OverviewView
+                  data={data}
+                  kpis={kpis}
+                  searchQuery={searchQuery}
+                  onOpenModal={setModal}
+                  onToggleTask={toggleTaskStatus}
+                  onMarkPaid={markPaymentPaid}
+                  onUpdateClassStatus={updateClassStatus}
+                  onSwitchTab={setCurrentTab}
+                />
+              )}
 
-            {currentTab === 'tasks' && (
-              <TasksView
-                tasks={data.tasks}
-                searchQuery={searchQuery}
-                onOpenModal={setModal}
-                onToggleTask={toggleTaskStatus}
-                onDeleteTask={deleteTask}
-              />
-            )}
+              {currentTab === 'tasks' && (
+                <TasksView
+                  tasks={data.tasks || []}
+                  searchQuery={searchQuery}
+                  onOpenModal={setModal}
+                  onToggleTask={toggleTaskStatus}
+                  onDeleteTask={deleteTask}
+                />
+              )}
 
-            {currentTab === 'classes' && (
-              <ClassesView
-                onClearAllClasses={clearAllClasses}
-                classes={data.classes}
-                students={data.students}
-                searchQuery={searchQuery}
-                onOpenModal={setModal}
-                onDeleteClass={deleteClass}
-              />
-            )}
+              {currentTab === 'classes' && (
+                <ClassesView
+                  onClearAllClasses={clearAllClasses}
+                  classes={data.classes || []}
+                  students={data.students || []}
+                  searchQuery={searchQuery}
+                  onOpenModal={setModal}
+                  onDeleteClass={deleteClass}
+                />
+              )}
 
-            {currentTab === 'students' && (
-              <StudentsView
-                onResetStudentBalances={resetStudentBalances}
-                students={data.students}
-                bookings={data.bookings}
-                classes={data.classes}
-                searchQuery={searchQuery}
-                onOpenModal={setModal}
-                onDeleteStudent={deleteStudent}
-                onDeleteBooking={deleteBooking}
-                onExportCsv={exportCsv}
-              />
-            )}
+              {currentTab === 'students' && (
+                <StudentsView
+                  onResetStudentBalances={resetStudentBalances}
+                  students={data.students || []}
+                  bookings={data.bookings || []}
+                  classes={data.classes || []}
+                  searchQuery={searchQuery}
+                  onOpenModal={setModal}
+                  onDeleteStudent={deleteStudent}
+                  onDeleteBooking={deleteBooking}
+                  onExportCsv={exportCsv}
+                />
+              )}
 
-            {currentTab === 'payments' && (
-              <PaymentsView
-                payments={data.payments}
-                students={data.students}
-                searchQuery={searchQuery}
-                onOpenModal={setModal}
-                onMarkPaid={markPaymentPaid}
-                onDeletePayment={deletePayment}
-                onCleanDuplicates={cleanDuplicatePayments}
-                onExportCsv={exportCsv}
-              />
-            )}
+              {currentTab === 'payments' && (
+                <PaymentsView
+                  payments={data.payments || []}
+                  students={data.students || []}
+                  searchQuery={searchQuery}
+                  onOpenModal={setModal}
+                  onMarkPaid={markPaymentPaid}
+                  onDeletePayment={deletePayment}
+                  onCleanDuplicates={cleanDuplicatePayments}
+                  onExportCsv={exportCsv}
+                />
+              )}
 
-            {currentTab === 'finanzas' && (
-              <FinanzasView
-                finanzas={data.finanzas}
-                kpis={kpis}
-                onUpdate={(fin) => setData(d => ({ ...d, finanzas: fin }))}
-              />
-            )}
+              {currentTab === 'finanzas' && (
+                <FinanzasView
+                  finanzas={data.finanzas || {}}
+                  kpis={kpis}
+                  onUpdate={(fin) => setData(d => ({ ...d, finanzas: fin }))}
+                />
+              )}
 
-            {currentTab === 'reports' && (
-              <ReportsView
-                data={data}
-                kpis={kpis}
-                onExportJson={exportJsonBackup}
-                onExportCsv={exportCsv}
-              />
-            )}
+              {currentTab === 'reports' && (
+                <ReportsView
+                  data={data}
+                  kpis={kpis}
+                  onExportJson={exportJsonBackup}
+                  onExportCsv={exportCsv}
+                />
+              )}
+            </ErrorBoundary>
           </main>
 
           {/* PIE DE PÁGINA */}
@@ -2089,7 +2091,7 @@
     // ----------------------------------------------------
     // PESTAÑA 4: ESTUDIANTES Y RESERVAS
     // ----------------------------------------------------
-    function StudentsView({ students, bookings, classes, searchQuery, onOpenModal, onDeleteStudent, onDeleteBooking, onExportCsv }) {
+    function StudentsView({ students = [], bookings = [], classes = [], searchQuery = '', onOpenModal, onDeleteStudent, onDeleteBooking, onExportCsv, onResetStudentBalances }) {
       const [activeSubTab, setActiveSubTab] = useState('roster');
 
       const filteredStudents = useMemo(() => {
