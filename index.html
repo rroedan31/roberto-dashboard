@@ -3501,12 +3501,13 @@
                 setBillingType(val);
                 if (val !== 'Regular') setAutoInvoice(false);
               }}
-              className="w-full px-3 py-2 rounded-lg bg-white dark:bg-slate-850 border border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-accent"
+              style={{ color: '#000000', backgroundColor: '#ffffff' }}
+              className="w-full px-3 py-2.5 rounded-lg bg-white border border-slate-300 font-bold text-black outline-none focus:ring-2 focus:ring-accent text-xs sm:text-sm"
             >
-              <option value="Regular">Clase Regular (Con cobro habitual)</option>
-              <option value="Cortesía">🎁 Clase de Cortesía (Sin cobro / $0)</option>
-              <option value="Gratis">⭐ Clase Gratis (Sin cobro / $0)</option>
-              <option value="Reposición">🔄 Clase de Reposición (Sin cobro / $0)</option>
+              <option value="Regular" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Clase Regular (Con cobro habitual)</option>
+              <option value="Cortesía" style={{ color: '#000000', backgroundColor: '#ffffff' }}>🎁 Clase de Cortesía (Sin cobro / $0)</option>
+              <option value="Gratis" style={{ color: '#000000', backgroundColor: '#ffffff' }}>⭐ Clase Gratis (Sin cobro / $0)</option>
+              <option value="Reposición" style={{ color: '#000000', backgroundColor: '#ffffff' }}>🔄 Clase de Reposición (Sin cobro / $0)</option>
             </select>
             {isNonBillable && (
               <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
@@ -3883,14 +3884,15 @@
                     setRate(0);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none font-bold"
+                style={{ color: '#000000', backgroundColor: '#ffffff' }}
+                className="w-full px-3 py-2 rounded-lg bg-white border border-slate-300 outline-none font-bold text-black"
               >
-                <option value="Pendiente">Pendiente (Por cobrar)</option>
-                <option value="Pagado">Pagado</option>
-                <option value="Vencido">Vencido</option>
-                <option value="Cortesía">🎁 Clase de Cortesía ($0)</option>
-                <option value="Gratis">⭐ Clase Gratis ($0)</option>
-                <option value="Reposición">🔄 Clase de Reposición ($0)</option>
+                <option value="Pendiente" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Pendiente (Por cobrar)</option>
+                <option value="Pagado" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Pagado</option>
+                <option value="Vencido" style={{ color: '#000000', backgroundColor: '#ffffff' }}>Vencido</option>
+                <option value="Cortesía" style={{ color: '#000000', backgroundColor: '#ffffff' }}>🎁 Clase de Cortesía ($0)</option>
+                <option value="Gratis" style={{ color: '#000000', backgroundColor: '#ffffff' }}>⭐ Clase Gratis ($0)</option>
+                <option value="Reposición" style={{ color: '#000000', backgroundColor: '#ffffff' }}>🔄 Clase de Reposición ($0)</option>
               </select>
             </div>
           </div>
