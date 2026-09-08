@@ -955,6 +955,7 @@
               <div className="flex space-x-1 sm:space-x-4 overflow-x-auto scrollbar-thin py-1 -mb-px border-t border-slate-100 dark:border-slate-800/80">
                 {[
                   { id: 'overview', label: 'Vista General', icon: Icons.Dashboard },
+                  { id: 'calendario', label: 'Calendario', icon: Icons.Calendar },
                   { id: 'tasks', label: 'Tareas y Prep', icon: Icons.Tasks, badge: kpis.openTasksCount > 0 ? kpis.openTasksCount : null },
                   { id: 'classes', label: 'Clases y Horarios', icon: Icons.Classes, badge: data.classes.length > 0 ? data.classes.length : null },
                   { id: 'students', label: 'Estudiantes y Reservas', icon: Icons.Students, badge: data.students.length > 0 ? data.students.length : null },
@@ -1003,6 +1004,16 @@
                   onMarkPaid={markPaymentPaid}
                   onUpdateClassStatus={updateClassStatus}
                   onSwitchTab={setCurrentTab}
+                />
+              )}
+
+              {currentTab === 'calendario' && (
+                <CalendarView
+                  classes={data.classes || []}
+                  students={data.students || []}
+                  bookings={data.bookings || []}
+                  onOpenModal={setModal}
+                  onDeleteClass={deleteClass}
                 />
               )}
 
@@ -2348,6 +2359,457 @@
               )}
             </div>
           )}
+        </div>
+      );
+    }
+
+    // ----------------------------------------------------
+    // PESTAÑA: CALENDARIO VISUAL DE HORAS (TIMELINE)
+    // ----------------------------------------------------
+    function CalendarView({ classes = [], students = [], bookings = [], onOpenModal = () => {}, onDeleteClass = () => {} }) {
+      const [currentDate, setCurrentDate] = useState(() => {
+        const today = new Date();
+        return today.toISOString().slice(0, 10);
+      });
+
+      const safeClasses = Array.isArray(classes) ? classes : [];
+      const safeStudents = Array.isArray(students) ? students : [];
+      const safeBookings = Array.isArray(bookings) ? bookings : [];
+
+      const studentMap = useMemo(() => {
+        return new Map(safeStudents.map(s => [s.id, s.name]));
+      }, [safeStudents]);
+
+      // Horas del timeline (desde las 7:00 AM hasta las 11:00 PM)
+      const hours = useMemo(() => {
+        const list = [];
+        for (let h = 7; h <= 23; h++) {
+          const hour12 = h % 12 === 0 ? 12 : h % 12;
+          const ampm = h < 12 ? 'AM' : 'PM';
+          list.push({
+            hour24: h,
+            label: `${hour12}:00 ${ampm}`,
+            shortLabel: `${hour12} ${ampm}`
+          });
+        }
+        return list;
+      }, []);
+
+      // Navegación de fechas
+      const handlePrevDay = () => {
+        const d = new Date(currentDate + 'T00:00:00');
+        d.setDate(d.getDate() - 1);
+        setCurrentDate(d.toISOString().slice(0, 10));
+      };
+
+      const handleNextDay = () => {
+        const d = new Date(currentDate + 'T00:00:00');
+        d.setDate(d.getDate() + 1);
+        setCurrentDate(d.toISOString().slice(0, 10));
+      };
+
+      const handleToday = () => {
+        setCurrentDate(new Date().toISOString().slice(0, 10));
+      };
+
+      // Formato legible en español
+      const formattedDateTitle = useMemo(() => {
+        try {
+          const parts = currentDate.split('-');
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          return d.toLocaleDateString('es-ES', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+          });
+        } catch (e) {
+          return currentDate;
+        }
+      }, [currentDate]);
+
+      // Determinar día de la semana correspondiente
+      const dayOfWeekName = useMemo(() => {
+        try {
+          const parts = currentDate.split('-');
+          const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+          const days = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+          return days[d.getDay()];
+        } catch (e) {
+          return '';
+        }
+      }, [currentDate]);
+
+      // Filtrar clases y reservas del día seleccionado
+      const dayEvents = useMemo(() => {
+        const events = [];
+
+        // 1. Clases que coincidan por fecha exacta (o por día semanal recurrente si no tienen fecha fija)
+        safeClasses.forEach(cls => {
+          let matches = false;
+          if (cls.date) {
+            if (cls.date === currentDate) matches = true;
+          } else if (cls.dayOfWeek) {
+            if (cls.dayOfWeek.toLowerCase() === dayOfWeekName.toLowerCase()) matches = true;
+          }
+          if (matches) {
+            // parsear hora y duración
+            let startMinutes = 18 * 60; // default 18:00
+            if (cls.time) {
+              const [h, m] = cls.time.split(':').map(Number);
+              if (!isNaN(h)) startMinutes = h * 60 + (m || 0);
+            }
+            const duration = Number(cls.durationMinutes) || 60;
+            const endMinutes = startMinutes + duration;
+
+            let studentNames = [];
+            if (Array.isArray(cls.enrolledStudentIds) && cls.enrolledStudentIds.length > 0) {
+              studentNames = cls.enrolledStudentIds.map(sid => studentMap.get(sid) || sid);
+            }
+
+            events.push({
+              id: 'cls-' + cls.id,
+              rawItem: cls,
+              type: 'class',
+              title: cls.name || 'Clase',
+              subtitle: studentNames.length > 0 ? studentNames.join(', ') : (cls.subject || 'Clase'),
+              timeStr: cls.time || '18:00',
+              startMinutes,
+              duration,
+              endMinutes,
+              status: cls.status || 'Programada',
+              paidStatus: null,
+              location: cls.location || ''
+            });
+          }
+        });
+
+        // 2. Reservas de la pestaña de estudiantes que tengan fecha igual a currentDate
+        safeBookings.forEach(b => {
+          if (b.date === currentDate) {
+            let startMinutes = 18 * 60;
+            if (b.time) {
+              const [h, m] = b.time.split(':').map(Number);
+              if (!isNaN(h)) startMinutes = h * 60 + (m || 0);
+            }
+            const duration = Number(b.duration) || 60;
+            events.push({
+              id: 'bk-' + b.id,
+              rawItem: b,
+              type: 'booking',
+              title: b.studentName || 'Estudiante',
+              subtitle: b.className || 'Sesión individual',
+              timeStr: b.time || '18:00',
+              startMinutes,
+              duration,
+              endMinutes: startMinutes + duration,
+              status: b.status || 'Confirmada',
+              paidStatus: b.paymentStatus || 'Pendiente',
+              location: ''
+            });
+          }
+        });
+
+        // Ordenar por hora de inicio
+        events.sort((a, b) => a.startMinutes - b.startMinutes);
+        return events;
+      }, [safeClasses, safeBookings, currentDate, dayOfWeekName, studentMap]);
+
+      // Formatear rango de hora (ej: 6:00 PM - 7:00 PM)
+      const formatTimeRange = (startMin, dur) => {
+        const endMin = startMin + dur;
+        const formatM = (totalM) => {
+          const h24 = Math.floor(totalM / 60);
+          const m = totalM % 60;
+          const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+          const ampm = h24 < 12 ? 'AM' : 'PM';
+          const mm = m < 10 ? '0' + m : m;
+          return `${h12}:${mm} ${ampm}`;
+        };
+        return `${formatM(startMin)} - ${formatM(endMin)}`;
+      };
+
+      const timelineStartMin = 7 * 60; // 7:00 AM
+      const timelineEndMin = 24 * 60;  // 12:00 AM (midnight)
+      const totalTimelineMin = timelineEndMin - timelineStartMin; // 17 hours = 1020 mins
+      const hourColWidth = 140; // px por hora
+
+      return (
+        <div className="space-y-6">
+          {/* BARRA SUPERIOR DE CONTROL ESTILO IMAGEN DE REFERENCIA */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            
+            {/* Navegación por fechas: Botones Anterior, Hoy, Siguiente y Selector */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5 shadow-sm">
+                <button
+                  onClick={handlePrevDay}
+                  className="px-2.5 py-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold transition flex items-center"
+                  title="Día anterior"
+                >
+                  <Icons.ChevronLeft />
+                </button>
+                <button
+                  onClick={handleToday}
+                  className="px-3 py-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold transition border-x border-slate-200 dark:border-slate-700"
+                >
+                  Hoy
+                </button>
+                <button
+                  onClick={handleNextDay}
+                  className="px-2.5 py-1.5 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold transition flex items-center"
+                  title="Día siguiente"
+                >
+                  <Icons.ChevronRight />
+                </button>
+              </div>
+
+              {/* Selector de Fecha */}
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                <Icons.Calendar />
+                <input
+                  type="date"
+                  value={currentDate}
+                  onChange={(e) => e.target.value && setCurrentDate(e.target.value)}
+                  className="bg-transparent text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-100 outline-none cursor-pointer"
+                />
+              </div>
+
+              {/* Título Legible de la fecha */}
+              <div className="hidden sm:block pl-2 border-l border-slate-200 dark:border-slate-700">
+                <span className="text-sm font-extrabold capitalize text-slate-900 dark:text-white">
+                  {formattedDateTitle}
+                </span>
+              </div>
+            </div>
+
+            {/* Badges de estado & Botón de acción */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200/60 dark:border-emerald-900 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>{dayEvents.length} {dayEvents.length === 1 ? 'Clase agendada' : 'Clases agendadas'}</span>
+              </div>
+
+              <button
+                onClick={() => onOpenModal({ type: 'class', defaultDate: currentDate })}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent-dark text-white text-xs font-bold shadow-md shadow-accent/20 transition"
+              >
+                <Icons.Plus /> Programar en este día
+              </button>
+            </div>
+          </div>
+
+          {/* VISTA TIMELINE HORIZONTAL (INSPIRADA EN LA IMAGEN DE REFERENCIA) */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            
+            {/* Header del Calendario */}
+            <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                  Horario Diario de Clases
+                </h3>
+                <span className="text-xs text-slate-400">
+                  (Desliza horizontalmente para ver todo el día)
+                </span>
+              </div>
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                7:00 AM — 11:00 PM
+              </span>
+            </div>
+
+            {/* Contenedor scrolleable horizontalmente */}
+            <div className="overflow-x-auto scrollbar-thin">
+              <div style={{ minWidth: `${hours.length * hourColWidth}px` }} className="relative select-none">
+                
+                {/* Cabecera de Horas (1:00 PM, 2:00 PM, etc.) */}
+                <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50">
+                  {hours.map(h => (
+                    <div
+                      key={h.hour24}
+                      style={{ width: `${hourColWidth}px` }}
+                      className="shrink-0 py-3 px-2 text-center border-r border-slate-200 dark:border-slate-800 last:border-r-0 flex items-center justify-center gap-1 text-xs font-bold text-slate-600 dark:text-slate-300"
+                    >
+                      <span>{h.label}</span>
+                      <span className="text-[10px] text-slate-400">🕒</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* FILA 1: PISTA PRINCIPAL DE CLASES (TIMELINE VISUAL) */}
+                <div className="relative h-44 bg-slate-50/30 dark:bg-slate-900/40">
+                  {/* Rejilla de fondo (líneas verticales de cada hora) */}
+                  <div className="absolute inset-0 flex pointer-events-none">
+                    {hours.map(h => (
+                      <div
+                        key={h.hour24}
+                        style={{ width: `${hourColWidth}px` }}
+                        className="shrink-0 border-r border-dashed border-slate-200 dark:border-slate-800 last:border-r-0 h-full"
+                      ></div>
+                    ))}
+                  </div>
+
+                  {/* BLOQUES DE CLASES RENDERIZADOS SEGÚN SU HORA */}
+                  {dayEvents.length === 0 ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 text-slate-400">
+                      <Icons.Calendar />
+                      <p className="text-xs font-semibold mt-2">No tienes clases agendadas para este día</p>
+                      <button
+                        onClick={() => onOpenModal({ type: 'class', defaultDate: currentDate })}
+                        className="mt-2 text-xs font-bold text-accent hover:underline"
+                      >
+                        + Haz clic aquí para programar una clase
+                      </button>
+                    </div>
+                  ) : (
+                    dayEvents.map(evt => {
+                      // Calcular posición en píxeles y ancho en píxeles
+                      const minSinceStart = Math.max(0, evt.startMinutes - timelineStartMin);
+                      const pxPerMinute = hourColWidth / 60;
+                      const leftPx = minSinceStart * pxPerMinute;
+                      const widthPx = Math.max(hourColWidth - 10, evt.duration * pxPerMinute);
+
+                      return (
+                        <div
+                          key={evt.id}
+                          style={{
+                            left: `${leftPx + 6}px`,
+                            width: `${widthPx - 12}px`,
+                            top: '12px',
+                            bottom: '12px'
+                          }}
+                          className="absolute z-10 rounded-xl p-3 shadow-md border transition-all duration-200 flex flex-col justify-between overflow-hidden bg-sky-50 dark:bg-sky-950/80 border-sky-200 dark:border-sky-800 text-sky-950 dark:text-sky-100 hover:shadow-lg hover:border-sky-400"
+                        >
+                          <div>
+                            {/* Cabecera del bloque: Nombre y Badge */}
+                            <div className="flex items-start justify-between gap-1">
+                              <h4 className="font-extrabold text-xs text-sky-900 dark:text-sky-200 truncate leading-tight" title={evt.title}>
+                                {evt.title}
+                              </h4>
+                              <span className="text-[10px] shrink-0 text-sky-600 dark:text-sky-300 font-bold">
+                                🕒
+                              </span>
+                            </div>
+
+                            {/* Subtítulo / Alumno */}
+                            <p className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 mt-0.5 truncate">
+                              {evt.subtitle}
+                            </p>
+
+                            {/* Rango de Horario (ej: 6:00 PM - 7:00 PM) */}
+                            <div className="mt-1 text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                              <span>{formatTimeRange(evt.startMinutes, evt.duration)}</span>
+                            </div>
+                          </div>
+
+                          {/* Pie de la tarjeta: Estado y Botones rápidos */}
+                          <div className="mt-2 pt-1.5 border-t border-sky-200/50 dark:border-sky-800/60 flex items-center justify-between text-[10px]">
+                            <div className="flex items-center gap-1">
+                              {evt.paidStatus === 'Pagado' ? (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+                                  Pagado
+                                </span>
+                              ) : (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                                  {evt.paidStatus || 'Programada'}
+                                </span>
+                              )}
+                              <span className="text-slate-400">({evt.duration}m)</span>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => onOpenModal({ type: evt.type, item: evt.rawItem })}
+                                className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold border border-slate-200 dark:border-slate-700"
+                                title="Editar"
+                              >
+                                Editar
+                              </button>
+                              {evt.type === 'class' && (
+                                <button
+                                  onClick={() => onDeleteClass(evt.rawItem.id)}
+                                  className="p-0.5 text-slate-400 hover:text-rose-500"
+                                  title="Eliminar clase"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+              </div>
+            </div>
+
+            {/* LISTA DETALLADA INFERIOR DEL DÍA (PARA VISTA RÁPIDA O MÓVILES) */}
+            <div className="border-t border-slate-100 dark:border-slate-800 p-4 sm:p-5 bg-slate-50/50 dark:bg-slate-850/40">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-3 flex items-center gap-2">
+                <span>Resumen del Día ({dayEvents.length} {dayEvents.length === 1 ? 'Sesión' : 'Sesiones'})</span>
+              </h4>
+
+              {dayEvents.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">No hay clases programadas en la lista para esta fecha.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {dayEvents.map(evt => (
+                    <div
+                      key={'card-' + evt.id}
+                      className="p-3.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/80 dark:border-slate-700/60 shadow-sm flex items-start justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-accent dark:text-accent-light">
+                            {evt.timeStr}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            {evt.duration} min
+                          </span>
+                        </div>
+                        <h5 className="font-bold text-sm text-slate-900 dark:text-white mt-1 truncate">
+                          {evt.title}
+                        </h5>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                          {evt.subtitle}
+                        </p>
+                        {evt.location && (
+                          <a
+                            href={evt.location}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-accent hover:underline mt-1.5 font-medium"
+                          >
+                            Enlace de reunión <Icons.ExternalLink />
+                          </a>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <button
+                          onClick={() => onOpenModal({ type: evt.type, item: evt.rawItem })}
+                          className="px-2 py-1 text-xs font-semibold rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+                        >
+                          Editar
+                        </button>
+                        {evt.type === 'class' && (
+                          <button
+                            onClick={() => onDeleteClass(evt.rawItem.id)}
+                            className="text-xs text-slate-400 hover:text-rose-500 p-1"
+                            title="Eliminar"
+                          >
+                            <Icons.Trash />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
         </div>
       );
     }
