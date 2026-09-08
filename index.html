@@ -2091,24 +2091,34 @@
     // ----------------------------------------------------
     // PESTAÑA 4: ESTUDIANTES Y RESERVAS
     // ----------------------------------------------------
-    function StudentsView({ students = [], bookings = [], classes = [], searchQuery = '', onOpenModal, onDeleteStudent, onDeleteBooking, onExportCsv, onResetStudentBalances }) {
+    function StudentsView({ students = [], bookings = [], classes = [], searchQuery = '', onOpenModal = () => {}, onDeleteStudent = () => {}, onDeleteBooking = () => {}, onExportCsv = () => {}, onResetStudentBalances = () => {} }) {
       const [activeSubTab, setActiveSubTab] = useState('roster');
 
+      const safeStudents = Array.isArray(students) ? students : [];
+      const safeBookings = Array.isArray(bookings) ? bookings : [];
+
       const filteredStudents = useMemo(() => {
-        return students.filter(s => {
+        return safeStudents.filter(s => {
+          if (!s) return false;
           if (!searchQuery) return true;
           const q = searchQuery.toLowerCase();
-          return s.name.toLowerCase().includes(q) || (s.email && s.email.toLowerCase().includes(q)) || (s.notes && s.notes.toLowerCase().includes(q));
+          const name = (s.name || '').toLowerCase();
+          const email = (s.email || '').toLowerCase();
+          const notes = (s.notes || '').toLowerCase();
+          return name.includes(q) || email.includes(q) || notes.includes(q);
         });
-      }, [students, searchQuery]);
+      }, [safeStudents, searchQuery]);
 
       const filteredBookings = useMemo(() => {
-        return bookings.filter(b => {
+        return safeBookings.filter(b => {
+          if (!b) return false;
           if (!searchQuery) return true;
           const q = searchQuery.toLowerCase();
-          return b.studentName.toLowerCase().includes(q) || (b.className && b.className.toLowerCase().includes(q));
+          const sName = (b.studentName || '').toLowerCase();
+          const cName = (b.className || '').toLowerCase();
+          return sName.includes(q) || cName.includes(q);
         });
-      }, [bookings, searchQuery]);
+      }, [safeBookings, searchQuery]);
 
       return (
         <div className="space-y-6">
@@ -2163,7 +2173,7 @@
                   : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
-              Directorio de Alumnos ({students.length})
+              Directorio de Alumnos ({safeStudents.length})
             </button>
             <button
               onClick={() => setActiveSubTab('bookings')}
@@ -2173,7 +2183,7 @@
                   : 'border-transparent text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
             >
-              Registro de Sesiones ({bookings.length})
+              Registro de Sesiones ({safeBookings.length})
             </button>
           </div>
 
@@ -2194,28 +2204,28 @@
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {filteredStudents.map(student => (
+                  {filteredStudents.map((student, idx) => (
                     <div
-                      key={student.id}
+                      key={student.id || idx}
                       className="bg-white dark:bg-slate-900 rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col justify-between"
                     >
                       <div>
                         <div className="flex items-start justify-between">
                           <div>
                             <h3 className="font-bold text-base text-slate-900 dark:text-white">
-                              {student.name}
+                              {student.name || 'Sin nombre'}
                             </h3>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${
                               student.status === 'Activo'
                                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                                 : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                             }`}>
-                              {student.status}
+                              {student.status || 'Activo'}
                             </span>
                           </div>
                           <div className="text-right">
                             <span className="text-sm font-extrabold text-accent dark:text-accent-light">
-                              ${student.hourlyRate}/h
+                              ${student.hourlyRate || 0}/h
                             </span>
                           </div>
                         </div>
@@ -2234,7 +2244,7 @@
 
                       <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                         <div>
-                          {student.balanceDue > 0 ? (
+                          {Number(student.balanceDue || 0) > 0 ? (
                             <span className="text-xs font-bold text-rose-500">Saldo: ${student.balanceDue}</span>
                           ) : (
                             <span className="text-xs font-bold text-emerald-500">Sin saldo pendiente</span>
@@ -2292,20 +2302,20 @@
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {filteredBookings.map(b => (
-                      <tr key={b.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
-                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">{b.studentName}</td>
-                        <td className="p-3.5 text-slate-600 dark:text-slate-300">{b.className}</td>
-                        <td className="p-3.5 text-slate-500">{b.date} a las {b.time}</td>
-                        <td className="p-3.5 text-slate-500">{b.duration} min</td>
-                        <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200">${b.rate}</td>
+                    {filteredBookings.map((b, idx) => (
+                      <tr key={b.id || idx} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition">
+                        <td className="p-3.5 font-bold text-slate-900 dark:text-white">{b.studentName || 'Sin alumno'}</td>
+                        <td className="p-3.5 text-slate-600 dark:text-slate-300">{b.className || 'Clase individual'}</td>
+                        <td className="p-3.5 text-slate-500">{(b.date || '') + (b.time ? ' a las ' + b.time : '')}</td>
+                        <td className="p-3.5 text-slate-500">{b.duration || 60} min</td>
+                        <td className="p-3.5 font-bold text-slate-800 dark:text-slate-200">${b.rate || 0}</td>
                         <td className="p-3.5">
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                             b.status === 'Confirmada' ? 'bg-accent/10 text-accent-dark dark:bg-accent/20 dark:text-accent-light' :
                             b.status === 'Completada' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
                             'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                           }`}>
-                            {b.status}
+                            {b.status || 'Pendiente'}
                           </span>
                         </td>
                         <td className="p-3.5">
@@ -2314,7 +2324,7 @@
                             b.paymentStatus === 'Vencido' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
                             'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                           }`}>
-                            {b.paymentStatus}
+                            {b.paymentStatus || 'Pendiente'}
                           </span>
                         </td>
                         <td className="p-3.5 text-right space-x-1.5">
