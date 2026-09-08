@@ -3341,13 +3341,14 @@
       );
     }
 
-        function ClassForm({ item, defaultDate, students, onSave, onCancel }) {
+    function ClassForm({ item, defaultDate, students, onSave, onCancel }) {
       const studentList = (students && Array.isArray(students)) ? students : [];
-      const initialStudentId = (item && item.enrolledStudentIds && item.enrolledStudentIds[0])
-        ? item.enrolledStudentIds[0]
-        : (studentList.length > 0 ? studentList[0].id : '');
+      
+      const initialStudentIds = (item && Array.isArray(item.enrolledStudentIds) && item.enrolledStudentIds.length > 0)
+        ? item.enrolledStudentIds
+        : (studentList.length > 0 ? [studentList[0].id] : []);
 
-      const [selectedStudentId, setSelectedStudentId] = useState(initialStudentId);
+      const [selectedStudentIds, setSelectedStudentIds] = useState(initialStudentIds);
       const [subject, setSubject] = useState(item ? (item.subject || 'Tutoría') : 'Tutoría');
       const [dayOfWeek, setDayOfWeek] = useState(item ? (item.dayOfWeek || 'Lunes') : 'Lunes');
       const [date, setDate] = useState((item && item.date) ? item.date : (defaultDate || new Date().toISOString().slice(0, 10)));
@@ -3357,19 +3358,30 @@
       const [description, setDescription] = useState((item && item.description) ? item.description : '');
       const [autoInvoice, setAutoInvoice] = useState(!item);
 
-      // Encontrar alumno actual
-      let studentName = '';
-      for (let i = 0; i < studentList.length; i++) {
-        if (studentList[i].id === selectedStudentId) {
-          studentName = studentList[i].name;
-          break;
-        }
-      }
-      if (!studentName && studentList.length > 0) {
-        studentName = studentList[0].name;
-      }
+      const toggleStudent = (id) => {
+        setSelectedStudentIds(prev => {
+          if (prev.includes(id)) {
+            // No permitir vaciar si es el único, o permitir al menos 1
+            if (prev.length <= 1) return prev;
+            return prev.filter(sid => sid !== id);
+          } else {
+            return [...prev, id];
+          }
+        });
+      };
 
-      const generatedClassName = studentName ? ('Clase con ' + studentName) : 'Clase individual';
+      // Nombres de los alumnos seleccionados
+      const selectedStudents = useMemo(() => {
+        return studentList.filter(s => selectedStudentIds.includes(s.id));
+      }, [studentList, selectedStudentIds]);
+
+      const studentNames = selectedStudents.map(s => s.name);
+      let generatedClassName = 'Clase';
+      if (studentNames.length === 1) {
+        generatedClassName = 'Clase con ' + studentNames[0];
+      } else if (studentNames.length > 1) {
+        generatedClassName = 'Clase con ' + studentNames.join(', ');
+      }
 
       const handleFormSubmit = (e) => {
         e.preventDefault();
@@ -3382,9 +3394,9 @@
           time: time || '18:00',
           durationMinutes: Number(durationMinutes) || 60,
           location: location || '',
-          capacity: 1,
+          capacity: Math.max(selectedStudentIds.length, 1),
           description: description || ('Sesión de ' + (durationMinutes || 60) + ' min'),
-          enrolledStudentIds: selectedStudentId ? [selectedStudentId] : [],
+          enrolledStudentIds: selectedStudentIds,
           status: (item && item.status) ? item.status : 'Programada',
           autoInvoice: Boolean(autoInvoice)
         });
@@ -3393,27 +3405,54 @@
       return (
         <form onSubmit={handleFormSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="font-semibold block mb-1 text-slate-700 dark:text-slate-200">Estudiante de la Clase *</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="font-bold text-slate-700 dark:text-slate-200">
+                Estudiantes de la Clase * ({selectedStudentIds.length} seleccionado{selectedStudentIds.length === 1 ? '' : 's'})
+              </label>
+              <span className="text-[11px] text-slate-400">Puedes seleccionar uno o varios</span>
+            </div>
+
             {studentList.length === 0 ? (
               <p className="text-xs text-rose-500 p-2 bg-rose-50 dark:bg-rose-950/40 rounded-lg">
                 No tienes alumnos registrados aún. Regístralos en la pestaña "Estudiantes y Reservas".
               </p>
             ) : (
-              <select
-                value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-semibold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-accent text-sm"
-              >
-                {studentList.map(s => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} {s.hourlyRate ? ('($' + s.hourlyRate + '/h)') : ''}
-                  </option>
-                ))}
-              </select>
+              <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-2.5 max-h-48 overflow-y-auto space-y-1.5 bg-slate-50/50 dark:bg-slate-800/50">
+                {studentList.map(s => {
+                  const isChecked = selectedStudentIds.includes(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      onClick={() => toggleStudent(s.id)}
+                      className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition select-none ${
+                        isChecked
+                          ? 'bg-accent/10 border border-accent/30 text-accent-dark dark:text-accent-light'
+                          : 'bg-white dark:bg-slate-800 border border-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-750'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}} // Manejado por onClick en label
+                          className="w-4 h-4 rounded text-accent focus:ring-accent accent-accent cursor-pointer"
+                        />
+                        <span className="font-bold text-xs">{s.name}</span>
+                      </div>
+                      {s.hourlyRate ? (
+                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                          ${s.hourlyRate}/h
+                        </span>
+                      ) : null}
+                    </label>
+                  );
+                })}
+              </div>
             )}
-            <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-              <span>Nombre de la clase:</span>
-              <span className="font-bold text-accent dark:text-accent-light">{generatedClassName}</span>
+
+            <div className="mt-2 p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] flex items-start gap-1.5">
+              <span className="text-slate-400 font-semibold shrink-0">Nombre automático:</span>
+              <span className="font-bold text-accent dark:text-accent-light break-words">{generatedClassName}</span>
             </div>
           </div>
 
