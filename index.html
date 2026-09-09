@@ -282,6 +282,45 @@
       return clean;
     }
 
+    // Función auxiliar para conciliar cobros con las clases actuales y eliminar cobros pendientes de clases eliminadas
+    function reconcilePaymentsWithClasses(paymentsList, classesList) {
+      if (!Array.isArray(paymentsList)) return [];
+      const safeClasses = Array.isArray(classesList) ? classesList : [];
+
+      return paymentsList.filter(p => {
+        // 1. Las facturas ya cobradas ('Pagado') se conservan siempre en el historial de ingresos
+        if (p.status === 'Pagado') return true;
+
+        // 2. Si tiene classId explícito, verificar si la clase existe
+        if (p.classId) {
+          return safeClasses.some(c => c && c.id === p.classId);
+        }
+
+        // 3. Si la nota comienza con "Clase:", es un cobro generado automáticamente por horario de clase
+        if (p.notes && typeof p.notes === 'string' && p.notes.startsWith('Clase:')) {
+          if (safeClasses.length === 0) return false;
+
+          const matchesExistingClass = safeClasses.some(c => {
+            if (!c) return false;
+            // Coincidencia por nombre de la clase
+            if (c.name && p.notes.includes(c.name)) return true;
+            // Coincidencia por hora y alumno
+            if (c.time && p.notes.includes(c.time)) {
+              if (Array.isArray(c.enrolledStudentIds) && p.studentId && c.enrolledStudentIds.includes(p.studentId)) {
+                return true;
+              }
+            }
+            return false;
+          });
+
+          return matchesExistingClass;
+        }
+
+        // 4. Cobros manuales u otros conceptos se conservan
+        return true;
+      });
+    }
+
     // Funciones auxiliares para deduplicar y fusionar clases y reservas
     function mergeClassesLists(...lists) {
       const map = new Map();
@@ -447,7 +486,10 @@
               : ((scan.foundTasks && scan.foundTasks.length > 0) ? scan.foundTasks : INITIAL_DATA.tasks),
             classes: initialClasses,
             bookings: initialBookings,
-            payments: deduplicatePaymentsList((baseData && baseData.payments) || scan.foundPayments || INITIAL_DATA.payments || []),
+            payments: reconcilePaymentsWithClasses(
+              deduplicatePaymentsList((baseData && baseData.payments) || scan.foundPayments || INITIAL_DATA.payments || []),
+              initialClasses
+            ),
             students: (baseData && Array.isArray(baseData.students) && baseData.students.length > 0)
               ? baseData.students
               : ((scan.foundStudents && scan.foundStudents.length > 0) ? scan.foundStudents : INITIAL_DATA.students),
@@ -487,11 +529,18 @@
             isInitialCloudLoadComplete.current = true;
             setData(prev => {
               const cloudData = records.data;
+              const safeClasses = Array.isArray(cloudData.classes) ? cloudData.classes : [];
+              const safeBookings = Array.isArray(cloudData.bookings) ? cloudData.bookings : [];
+              const reconciledPayments = reconcilePaymentsWithClasses(
+                deduplicatePaymentsList(cloudData.payments || []),
+                safeClasses
+              );
               return {
                 ...prev,
                 ...cloudData,
-                classes: Array.isArray(cloudData.classes) ? cloudData.classes : [],
-                bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : []
+                classes: safeClasses,
+                bookings: safeBookings,
+                payments: reconciledPayments
               };
             });
             setSyncStatus('synced');
@@ -526,12 +575,18 @@
               isInitialCloudLoadComplete.current = true;
               setData(prev => {
                 const cloudData = records.data;
-                // Si en la nube las clases son undefined o no es array, usar []; de lo contrario respetar estrictamente lo que hay en la nube
+                const safeClasses = Array.isArray(cloudData.classes) ? cloudData.classes : [];
+                const safeBookings = Array.isArray(cloudData.bookings) ? cloudData.bookings : [];
+                const reconciledPayments = reconcilePaymentsWithClasses(
+                  deduplicatePaymentsList(cloudData.payments || []),
+                  safeClasses
+                );
                 return {
                   ...prev,
                   ...cloudData,
-                  classes: Array.isArray(cloudData.classes) ? cloudData.classes : [],
-                  bookings: Array.isArray(cloudData.bookings) ? cloudData.bookings : []
+                  classes: safeClasses,
+                  bookings: safeBookings,
+                  payments: reconciledPayments
                 };
               });
               setSyncStatus('synced');
@@ -572,11 +627,18 @@
                   isRemoteUpdateRef.current = true;
                   setData(prev => {
                     const newData = payload.new.data;
+                    const safeClasses = Array.isArray(newData.classes) ? newData.classes : [];
+                    const safeBookings = Array.isArray(newData.bookings) ? newData.bookings : [];
+                    const reconciledPayments = reconcilePaymentsWithClasses(
+                      deduplicatePaymentsList(newData.payments || []),
+                      safeClasses
+                    );
                     return {
                       ...prev,
                       ...newData,
-                      classes: Array.isArray(newData.classes) ? newData.classes : [],
-                      bookings: Array.isArray(newData.bookings) ? newData.bookings : []
+                      classes: safeClasses,
+                      bookings: safeBookings,
+                      payments: reconciledPayments
                     };
                   });
                   setSyncStatus('synced');
@@ -718,6 +780,7 @@
                 newPayments.push({
                   id: 'inv-' + Date.now() + '-' + idx,
                   invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(Math.random() * 10000),
+                  classId: classData.id,
                   studentId: student.id,
                   studentName: student.name,
                   amount: student.hourlyRate * (classData.durationMinutes / 60),
@@ -735,7 +798,7 @@
           let currentPayments = prev.payments;
           if (isNonBillable) {
             currentPayments = currentPayments.filter(p => {
-              const matchesNote = p.notes && (p.notes.includes(classData.name) || p.notes.includes(cls.id));
+              const matchesNote = (p.classId && p.classId === classId) || (p.notes && (p.notes.includes(classData.name) || p.notes.includes(cls.id)));
               return !matchesNote;
             });
           }
@@ -843,10 +906,29 @@
       };
 
       const deleteClass = async (id) => {
-        if (confirm("¿Estás seguro de que deseas eliminar este horario de clase?")) {
+        if (confirm("¿Estás seguro de que deseas eliminar este horario de clase y sus cobros pendientes asociados?")) {
+          const clsToDelete = (data.classes || []).find(c => c.id === id);
           const updatedClasses = (data.classes || []).filter(c => c.id !== id);
           const updatedBookings = (data.bookings || []).filter(b => b.classId !== id);
-          const updatedData = { ...data, classes: updatedClasses, bookings: updatedBookings };
+
+          // Eliminar facturas pendientes asociadas a la clase que se acaba de eliminar
+          let updatedPayments = (data.payments || []).filter(p => {
+            // Mantener cualquier cobro ya pagado ('Pagado') para el historial contable
+            if (p.status === 'Pagado') return true;
+            // Si coincide por classId
+            if (p.classId && p.classId === id) return false;
+            // Si coincide por notas de la clase
+            if (clsToDelete) {
+              if (p.notes && p.notes.includes(clsToDelete.name)) return false;
+              if (p.notes && p.notes.startsWith('Clase:') && clsToDelete.time && p.notes.includes(clsToDelete.time)) return false;
+            }
+            return true;
+          });
+
+          // Reconciliar además cualquier cobro pendiente de clases eliminadas previamente
+          updatedPayments = reconcilePaymentsWithClasses(updatedPayments, updatedClasses);
+
+          const updatedData = { ...data, classes: updatedClasses, bookings: updatedBookings, payments: updatedPayments };
 
           // 1. Guardar de inmediato en localStorage
           try {
@@ -873,7 +955,7 @@
             }
           }
 
-          showToast("Clase eliminada permanentemente", "info");
+          showToast("Clase y cobros pendientes asociados eliminados", "info");
         }
       };
 
@@ -976,6 +1058,7 @@
                   updatedPayments.unshift({
                     id: 'inv-' + Date.now() + '-' + idx,
                     invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
+                    classId: cls.id,
                     studentId: s.id,
                     studentName: s.name,
                     amount: s.hourlyRate * ((cls.durationMinutes || 60) / 60),
@@ -1003,6 +1086,7 @@
                     updatedPayments.unshift({
                       id: 'inv-' + Date.now() + '-' + idx,
                       invoiceNum: 'FAC-' + new Date().getFullYear() + '-' + Math.floor(1000 + Math.random() * 9000),
+                      classId: cls.id,
                       studentId: s.id,
                       studentName: s.name,
                       amount: s.hourlyRate * ((cls.durationMinutes || 60) / 60),
@@ -1016,6 +1100,13 @@
                 }
               });
             }
+          } else if (newStatus === 'Suspendida') {
+            // Si la clase se suspende, retirar cobros pendientes para no acumular deuda irreal
+            updatedPayments = updatedPayments.filter(p => {
+              if (p.status === 'Pagado') return true;
+              const matches = (p.classId && p.classId === classId) || (p.notes && cls && p.notes.includes(cls.name));
+              return !matches;
+            });
           }
           
           return {
@@ -1036,12 +1127,13 @@
 
       const cleanDuplicatePayments = () => {
         setData(prev => {
-          const clean = deduplicatePaymentsList(prev.payments);
+          const deduped = deduplicatePaymentsList(prev.payments);
+          const clean = reconcilePaymentsWithClasses(deduped, prev.classes);
           const removedCount = prev.payments.length - clean.length;
           if (removedCount > 0) {
-            showToast(`¡Se eliminaron ${removedCount} factura(s) duplicada(s)!`);
+            showToast(`¡Se limpiaron ${removedCount} cobro(s) huérfanos o duplicados!`);
           } else {
-            showToast("No se encontraron facturas duplicadas", "info");
+            showToast("Todos los cobros coinciden con tus clases agendadas", "info");
           }
           return { ...prev, payments: clean };
         });
@@ -1360,6 +1452,7 @@
                   students={data.students || []}
                   bookings={data.bookings || []}
                   classes={data.classes || []}
+                  payments={data.payments || []}
                   searchQuery={searchQuery}
                   onOpenModal={setModal}
                   onDeleteStudent={deleteStudent}
@@ -1660,6 +1753,16 @@
                   <div className="space-y-3">
                     {dayClasses.map(cls => {
                       const currentStatus = cls.status || 'Programada';
+                      let totalClassRevenue = 0;
+                      if (!cls.billingType || cls.billingType === 'Regular') {
+                        (cls.enrolledStudentIds || []).forEach(sid => {
+                          const student = data.students.find(s => s.id === sid);
+                          if (student && student.hourlyRate) {
+                            totalClassRevenue += student.hourlyRate * ((cls.durationMinutes || 60) / 60);
+                          }
+                        });
+                      }
+                      
                       return (
                         <div
                           key={cls.id}
@@ -1677,7 +1780,7 @@
                                   ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
                                   : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
                               }`}>
-                                {currentStatus}
+                                {currentStatus} {totalClassRevenue > 0 && `($${totalClassRevenue.toLocaleString()})`}
                               </span>
                             </div>
                             <h4 className="text-xs font-bold text-slate-900 dark:text-white leading-tight">
@@ -2339,6 +2442,16 @@
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {filteredClasses.map(cls => {
                 const enrolledCount = (cls.enrolledStudentIds || []).length;
+                let totalClassRevenue = 0;
+                if (!cls.billingType || cls.billingType === 'Regular') {
+                  (cls.enrolledStudentIds || []).forEach(sid => {
+                    const student = students.find(s => s.id === sid);
+                    if (student && student.hourlyRate) {
+                      totalClassRevenue += student.hourlyRate * ((cls.durationMinutes || 60) / 60);
+                    }
+                  });
+                }
+                
                 return (
                   <div
                     key={cls.id}
@@ -2415,7 +2528,10 @@
                     </div>
 
                     <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                      <span className="text-xs text-slate-400">Modalidad: Regular</span>
+                      <span className="text-xs text-slate-400">
+                        Modalidad: {cls.billingType || 'Regular'}
+                        {totalClassRevenue > 0 && <span className="font-bold text-emerald-600 dark:text-emerald-400 ml-1">(${totalClassRevenue.toLocaleString()} total)</span>}
+                      </span>
                       {cls.location && (
                         <a
                           href={cls.location}
@@ -2439,11 +2555,25 @@
     // ----------------------------------------------------
     // PESTAÑA 4: ESTUDIANTES Y RESERVAS
     // ----------------------------------------------------
-    function StudentsView({ students = [], bookings = [], classes = [], searchQuery = '', onOpenModal = () => {}, onDeleteStudent = () => {}, onDeleteBooking = () => {}, onExportCsv = () => {}, onResetStudentBalances = () => {} }) {
+    function StudentsView({ students = [], bookings = [], classes = [], payments = [], searchQuery = '', onOpenModal = () => {}, onDeleteStudent = () => {}, onDeleteBooking = () => {}, onExportCsv = () => {}, onResetStudentBalances = () => {} }) {
       const [activeSubTab, setActiveSubTab] = useState('roster');
 
       const safeStudents = Array.isArray(students) ? students : [];
       const safeBookings = Array.isArray(bookings) ? bookings : [];
+
+      // Mapeo dinámico de cobros pendientes por estudiante
+      const pendingByStudent = useMemo(() => {
+        const map = new Map();
+        (payments || []).forEach(p => {
+          if (p.status === 'Pendiente' || p.status === 'Vencido') {
+            const sid = p.studentId;
+            if (sid) {
+              map.set(sid, (map.get(sid) || 0) + Number(p.amount || 0));
+            }
+          }
+        });
+        return map;
+      }, [payments]);
 
       const filteredStudents = useMemo(() => {
         return safeStudents.filter(s => {
@@ -2592,11 +2722,14 @@
 
                       <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                         <div>
-                          {Number(student.balanceDue || 0) > 0 ? (
-                            <span className="text-xs font-bold text-rose-500">Saldo: ${student.balanceDue}</span>
-                          ) : (
-                            <span className="text-xs font-bold text-emerald-500">Sin saldo pendiente</span>
-                          )}
+                          {(() => {
+                            const dynamicBalance = (pendingByStudent.get(student.id) || 0) + Number(student.balanceDue || 0);
+                            return dynamicBalance > 0 ? (
+                              <span className="text-xs font-bold text-rose-500">Saldo: ${dynamicBalance.toLocaleString()}</span>
+                            ) : (
+                              <span className="text-xs font-bold text-emerald-500">Sin saldo pendiente</span>
+                            );
+                          })()}
                         </div>
                         <div className="flex items-center gap-1.5">
                           <button
@@ -2800,8 +2933,16 @@
             const endMinutes = startMinutes + duration;
 
             let studentNames = [];
+            let totalRate = 0;
             if (Array.isArray(cls.enrolledStudentIds) && cls.enrolledStudentIds.length > 0) {
-              studentNames = cls.enrolledStudentIds.map(sid => studentMap.get(sid) || sid);
+              cls.enrolledStudentIds.forEach(sid => {
+                const sName = studentMap.get(sid) || sid;
+                studentNames.push(sName);
+                const sObj = safeStudents.find(st => st.id === sid);
+                if (sObj && sObj.hourlyRate && (!cls.billingType || cls.billingType === 'Regular')) {
+                  totalRate += sObj.hourlyRate * (duration / 60);
+                }
+              });
             }
 
             const billingType = cls.billingType || 'Regular';
@@ -2823,6 +2964,7 @@
               status: cls.status || 'Programada',
               paidStatus,
               billingType,
+              totalRate,
               location: cls.location || ''
             });
           }
@@ -3061,11 +3203,11 @@
                                 </span>
                               ) : evt.paidStatus === 'Pagado' ? (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                                  Pagado
+                                  Pagado {evt.totalRate ? `($${evt.totalRate})` : ''}
                                 </span>
                               ) : (
                                 <span className="px-1.5 py-0.2 rounded font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
-                                  {evt.paidStatus || 'Programada'}
+                                  {evt.paidStatus || 'Programada'} {evt.totalRate ? `($${evt.totalRate})` : ''}
                                 </span>
                               )}
                               <span className="text-slate-400">({evt.duration}m)</span>
@@ -3204,10 +3346,10 @@
             <div className="flex flex-wrap items-center gap-2">
               <button
                 onClick={onCleanDuplicates}
-                title="Eliminar facturas que tengan el mismo alumno, monto y concepto"
+                title="Eliminar facturas duplicadas o cobros pendientes de clases que fueron eliminadas"
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/60 text-xs font-semibold text-amber-800 dark:text-amber-300 border border-amber-200/80 dark:border-amber-800/60 transition"
               >
-                <Icons.Refresh /> Limpiar Duplicados
+                <Icons.Refresh /> Limpiar Duplicados y Huérfanas
               </button>
               <button
                 onClick={() => onExportCsv('pagos')}
@@ -3773,12 +3915,26 @@
         return studentList.filter(s => selectedStudentIds.includes(s.id));
       }, [studentList, selectedStudentIds]);
 
+      const totalEstimatedRate = useMemo(() => {
+        let total = 0;
+        selectedStudents.forEach(s => {
+          if (s.hourlyRate) {
+            total += s.hourlyRate * (durationMinutes / 60);
+          }
+        });
+        return total;
+      }, [selectedStudents, durationMinutes]);
+
       const studentNames = selectedStudents.map(s => s.name);
       let generatedClassName = 'Clase';
       if (studentNames.length === 1) {
-        generatedClassName = 'Clase con ' + studentNames[0];
+        generatedClassName = `Clase con ${studentNames[0]}`;
       } else if (studentNames.length > 1) {
-        generatedClassName = 'Clase con ' + studentNames.join(', ');
+        if (studentNames.length <= 3) {
+          generatedClassName = `Grupo: ${studentNames.join(', ')}`;
+        } else {
+          generatedClassName = `Grupo con ${studentNames[0]} y ${studentNames.length - 1} más`;
+        }
       }
 
       const isNonBillable = billingType !== 'Regular';
@@ -3877,10 +4033,16 @@
               <option value="Gratis" style={{ color: '#000000', backgroundColor: '#ffffff' }}>⭐ Clase Gratis (Sin cobro / $0)</option>
               <option value="Reposición" style={{ color: '#000000', backgroundColor: '#ffffff' }}>🔄 Clase de Reposición (Sin cobro / $0)</option>
             </select>
-            {isNonBillable && (
+            {isNonBillable ? (
               <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
                 <span>✓ Esta clase no generará cobro ni contará como saldo pendiente.</span>
               </p>
+            ) : (
+              totalEstimatedRate > 0 && (
+                <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1">
+                  <span>✓ Tarifa total estimada para esta clase: ${totalEstimatedRate.toLocaleString()}</span>
+                </p>
+              )
             )}
           </div>
 
@@ -3974,7 +4136,8 @@
                 className="w-4 h-4 accent-emerald-600"
               />
               <label htmlFor="autoInvoiceCheck" className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 cursor-pointer">
-                Generar factura pendiente automáticamente para este alumno
+                Generar {selectedStudentIds.length > 1 ? 'facturas pendientes automáticamente para los alumnos seleccionados' : 'factura pendiente automáticamente para este alumno'} 
+                {totalEstimatedRate > 0 && ` (Total esperado: $${totalEstimatedRate.toLocaleString()})`}
               </label>
             </div>
           )}
